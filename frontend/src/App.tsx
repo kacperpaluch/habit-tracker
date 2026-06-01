@@ -10,9 +10,17 @@ import CalendarPage from './pages/CalendarPage'
 import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
-  const { isAuthenticated, login, logout } = useAuth()
+  const { isAuthenticated, isLoadingAuth, authDisabled, login, logout } = useAuth()
   const [page, setPage] = useState('today')
   useTheme() // init theme on mount
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
@@ -26,7 +34,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       <Toaster position="top-right" />
-      <Navbar page={page} setPage={setPage} onLogout={logout} />
+      <Navbar page={page} setPage={setPage} onLogout={logout} authDisabled={authDisabled} />
       <main>
         {page === 'today' && <TodayPage />}
         {page === 'stats' && <StatsPage />}

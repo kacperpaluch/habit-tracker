@@ -20,6 +20,8 @@ export const backupApi = {
 }
 
 export const authApi = {
+  getConfig: () =>
+    api.get<{ auth_disabled: boolean }>('/auth/config').then(r => r.data),
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>('/auth/login', { username, password }).then(r => r.data),
 }

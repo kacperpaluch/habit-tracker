@@ -11,6 +11,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - AUTH_DISABLED=${AUTH_DISABLED:-false}
 
       # Timezone
       - TZ=${TZ:-Europe/Warsaw}

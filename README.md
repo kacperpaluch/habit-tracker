@@ -44,12 +44,13 @@ Aplikacja będzie dostępna pod adresem **http://localhost:8000**
 | `SECRET_KEY` | losowy string | Klucz podpisywania tokenów JWT |
 | `TZ` | `Europe/Warsaw` | Strefa czasowa (wpływa na harmonogram przypomnień) |
 | `SMTP_HOST` | — | Serwer SMTP do e-maili |
-| `SMTP_PORT` | `587` | Port SMTP |
+| `SMTP_PORT` | `587` | Port SMTP (587 → STARTTLS, 465 → implicit TLS) |
 | `SMTP_USER` | — | Login SMTP |
 | `SMTP_PASSWORD` | — | Hasło SMTP |
 | `SMTP_TLS` | `true` | Użyj TLS/SSL |
 | `SMTP_FROM` | — | Adres nadawcy |
 | `NOTIFICATION_EMAIL` | — | Adres docelowy przypomnień |
+| `AUTH_DISABLED` | `false` | Wyłącz logowanie — **tylko lokalnie/dev!** |
 
 Ustawienia SMTP można też zmienić w UI → Ustawienia.
 

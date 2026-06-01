@@ -6,9 +6,10 @@ interface NavbarProps {
   page: string
   setPage: (p: string) => void
   onLogout: () => void
+  authDisabled?: boolean
 }
 
-export default function Navbar({ page, setPage, onLogout }: NavbarProps) {
+export default function Navbar({ page, setPage, onLogout, authDisabled = false }: NavbarProps) {
   const { dark, toggle } = useTheme()
 
   const nav = [
@@ -51,13 +52,15 @@ export default function Navbar({ page, setPage, onLogout }: NavbarProps) {
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button
-            onClick={onLogout}
-            className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title="Wyloguj"
-          >
-            <LogOut size={18} />
-          </button>
+          {!authDisabled && (
+            <button
+              onClick={onLogout}
+              className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title="Wyloguj"
+            >
+              <LogOut size={18} />
+            </button>
+          )}
         </div>
       </div>
     </header>

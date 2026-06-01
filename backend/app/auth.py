@@ -12,6 +12,7 @@ import os
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-please-use-long-random-string")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days
+AUTH_DISABLED = os.getenv("AUTH_DISABLED", "false").lower() == "true"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -36,6 +37,12 @@ def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Settings:
+    if AUTH_DISABLED:
+        settings = db.query(Settings).first()
+        if settings is None:
+            raise HTTPException(status_code=500, detail="App not initialized")
+        return settings
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",

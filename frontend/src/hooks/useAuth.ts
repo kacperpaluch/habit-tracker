@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { authApi } from '../api/settings'
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
+  const [authDisabled, setAuthDisabled] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    authApi.getConfig()
+      .then(({ auth_disabled }) => setAuthDisabled(auth_disabled))
+      .catch(() => setAuthDisabled(false))
+  }, [])
 
   const login = async (username: string, password: string) => {
     const data = await authApi.login(username, password)
@@ -15,5 +22,12 @@ export function useAuth() {
     setToken(null)
   }
 
-  return { token, isAuthenticated: !!token, login, logout }
+  return {
+    token,
+    isAuthenticated: authDisabled === true || !!token,
+    isLoadingAuth: authDisabled === null,
+    authDisabled: authDisabled ?? false,
+    login,
+    logout,
+  }
 }

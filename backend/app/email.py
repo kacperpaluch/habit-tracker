@@ -21,7 +21,11 @@ async def send_email(settings: Settings, subject: str, body_html: str):
         "password": settings.smtp_password,
     }
     if settings.smtp_tls:
-        kwargs["use_tls"] = True
+        # port 465 → implicit TLS; port 587 (i inne) → STARTTLS
+        if settings.smtp_port == 465:
+            kwargs["use_tls"] = True
+        else:
+            kwargs["start_tls"] = True
 
     await aiosmtplib.send(msg, **kwargs)
 

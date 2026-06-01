@@ -2,10 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Settings
-from ..auth import verify_password, create_access_token
+from ..auth import verify_password, create_access_token, AUTH_DISABLED
 from ..schemas import Token, LoginRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+@router.get("/config")
+def auth_config():
+    return {"auth_disabled": AUTH_DISABLED}
 
 
 @router.post("/login", response_model=Token)
