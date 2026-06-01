@@ -1,0 +1,338 @@
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Save, TestTube, Upload, Download, Trash2, Plus, Edit2, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { settingsApi, backupApi } from '../api/settings'
+import { categoriesApi } from '../api/categories'
+import type { Category } from '../types'
+
+const TIMEZONES = [
+  'UTC', 'Europe/Warsaw', 'Europe/London', 'Europe/Berlin', 'America/New_York',
+  'America/Chicago', 'America/Los_Angeles', 'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney',
+]
+
+export default function SettingsPage() {
+  const qc = useQueryClient()
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsApi.get })
+  const { data: backups = [] } = useQuery({ queryKey: ['backups'], queryFn: backupApi.list })
+  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
+
+  const [form, setForm] = useState({
+    smtp_host: '', smtp_port: 587, smtp_user: '', smtp_password: '',
+    smtp_tls: true, smtp_from: '', notification_email: '',
+    backup_enabled: true, backup_retention: 10, backup_cron: '0 3 * * *',
+    daily_summary_time: '08:00', daily_summary_enabled: false,
+    timezone: 'UTC', current_password: '', new_password: '', new_password2: '',
+  })
+  const [catForm, setCatForm] = useState({ name: '', color: '#6366f1', icon: 'tag' })
+  const [editingCat, setEditingCat] = useState<Category | null>(null)
+
+  useEffect(() => {
+    if (settings) {
+      setForm(f => ({
+        ...f,
+        smtp_host: settings.smtp_host, smtp_port: settings.smtp_port,
+        smtp_user: settings.smtp_user, smtp_tls: settings.smtp_tls,
+        smtp_from: settings.smtp_from, notification_email: settings.notification_email,
+        backup_enabled: settings.backup_enabled, backup_retention: settings.backup_retention,
+        backup_cron: settings.backup_cron, daily_summary_time: settings.daily_summary_time,
+        daily_summary_enabled: settings.daily_summary_enabled, timezone: settings.timezone,
+      }))
+    }
+  }, [settings])
+
+  const updateMutation = useMutation({
+    mutationFn: (data: typeof form) => settingsApi.update(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['settings'] }); toast.success('Zapisano!') },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Błąd'),
+  })
+
+  const testEmailMutation = useMutation({
+    mutationFn: settingsApi.testEmail,
+    onSuccess: () => toast.success('E-mail testowy wysłany!'),
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Błąd SMTP'),
+  })
+
+  const deleteBkMutation = useMutation({
+    mutationFn: backupApi.delete,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+  })
+
+  const createCatMutation = useMutation({
+    mutationFn: () => editingCat
+      ? categoriesApi.update(editingCat.id, catForm)
+      : categoriesApi.create(catForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      setCatForm({ name: '', color: '#6366f1', icon: 'tag' })
+      setEditingCat(null)
+      toast.success(editingCat ? 'Kategoria zaktualizowana' : 'Kategoria dodana')
+    },
+  })
+
+  const deleteCatMutation = useMutation({
+    mutationFn: categoriesApi.delete,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categories'] }); qc.invalidateQueries({ queryKey: ['habits'] }) },
+  })
+
+  const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (form.new_password && form.new_password !== form.new_password2) {
+      toast.error('Hasła nie są zgodne')
+      return
+    }
+    updateMutation.mutate(form)
+  }
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    backupApi.import(file).then(() => {
+      qc.invalidateQueries()
+      toast.success('Import zakończony pomyślnie!')
+    }).catch(() => toast.error('Błąd importu'))
+    e.target.value = ''
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ustawienia</h1>
+
+      <form onSubmit={handleSave} className="space-y-8">
+        {/* SMTP */}
+        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Powiadomienia e-mail (SMTP)</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Serwer SMTP</label>
+              <input value={form.smtp_host} onChange={e => set('smtp_host', e.target.value)} className="input" placeholder="smtp.example.com" />
+            </div>
+            <div>
+              <label className="label">Port</label>
+              <input type="number" value={form.smtp_port} onChange={e => set('smtp_port', parseInt(e.target.value))} className="input" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Użytkownik</label>
+              <input value={form.smtp_user} onChange={e => set('smtp_user', e.target.value)} className="input" />
+            </div>
+            <div>
+              <label className="label">Hasło SMTP</label>
+              <input type="password" value={form.smtp_password} onChange={e => set('smtp_password', e.target.value)} className="input" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Adres nadawcy</label>
+              <input value={form.smtp_from} onChange={e => set('smtp_from', e.target.value)} className="input" placeholder="no-reply@example.com" />
+            </div>
+            <div>
+              <label className="label">Adres docelowy</label>
+              <input type="email" value={form.notification_email} onChange={e => set('notification_email', e.target.value)} className="input" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.smtp_tls} onChange={e => set('smtp_tls', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Użyj TLS/SSL</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.daily_summary_enabled} onChange={e => set('daily_summary_enabled', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Dzienne podsumowanie</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Godzina podsumowania</label>
+              <input type="time" value={form.daily_summary_time} onChange={e => set('daily_summary_time', e.target.value)} className="input" />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => testEmailMutation.mutate()}
+                disabled={testEmailMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+              >
+                <TestTube size={15} />
+                Wyślij testowy e-mail
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* General */}
+        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Ogólne</h2>
+          <div>
+            <label className="label">Strefa czasowa</label>
+            <select value={form.timezone} onChange={e => set('timezone', e.target.value)} className="input">
+              {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+            </select>
+          </div>
+        </section>
+
+        {/* Password */}
+        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Zmiana hasła</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Aktualne hasło</label>
+              <input type="password" value={form.current_password} onChange={e => set('current_password', e.target.value)} className="input" />
+            </div>
+            <div>
+              <label className="label">Nowe hasło</label>
+              <input type="password" value={form.new_password} onChange={e => set('new_password', e.target.value)} className="input" />
+            </div>
+            <div>
+              <label className="label">Powtórz hasło</label>
+              <input type="password" value={form.new_password2} onChange={e => set('new_password2', e.target.value)} className="input" />
+            </div>
+          </div>
+        </section>
+
+        {/* Backup */}
+        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Backup</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.backup_enabled} onChange={e => set('backup_enabled', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Automatyczny backup</span>
+            </label>
+            <div>
+              <label className="label">Zachowaj ostatnich N backupów</label>
+              <input type="number" min="1" value={form.backup_retention} onChange={e => set('backup_retention', parseInt(e.target.value))} className="input" />
+            </div>
+          </div>
+          <div>
+            <label className="label">Harmonogram (cron)</label>
+            <input value={form.backup_cron} onChange={e => set('backup_cron', e.target.value)} className="input font-mono" placeholder="0 3 * * *" />
+          </div>
+
+          <div className="flex gap-3 flex-wrap">
+            <button type="button" onClick={backupApi.export} className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+              <Download size={15} /> Eksportuj dane (JSON)
+            </button>
+            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-pointer">
+              <Upload size={15} /> Importuj dane
+              <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+            </label>
+          </div>
+
+          {backups.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zapisane backupy</p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {backups.map(b => (
+                  <div key={b.filename} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs">
+                    <span className="text-gray-700 dark:text-gray-300 font-mono truncate">{b.filename}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <span className="text-gray-400">{(b.size / 1024).toFixed(1)} KB</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteBkMutation.mutate(b.filename)}
+                        className="text-red-400 hover:text-red-600"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={updateMutation.isPending}
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors disabled:opacity-60"
+          >
+            <Save size={16} />
+            {updateMutation.isPending ? 'Zapisywanie…' : 'Zapisz ustawienia'}
+          </button>
+        </div>
+      </form>
+
+      {/* Categories */}
+      <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Kategorie</h2>
+
+        <div className="space-y-2">
+          {categories.map(c => (
+            <div key={c.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: c.color }} />
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{c.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { setEditingCat(c); setCatForm({ name: c.name, color: c.color, icon: c.icon }) }}
+                  className="p-1.5 text-gray-400 hover:text-primary-600 rounded"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  onClick={() => { if (confirm(`Usunąć kategorię "${c.name}"?`)) deleteCatMutation.mutate(c.id) }}
+                  className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex-1">
+            <label className="label">Nazwa</label>
+            <input
+              value={catForm.name}
+              onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
+              className="input"
+              placeholder="np. Zdrowie"
+            />
+          </div>
+          <div>
+            <label className="label">Kolor</label>
+            <input
+              type="color"
+              value={catForm.color}
+              onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))}
+              className="h-10 w-14 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+            />
+          </div>
+          <div className="flex gap-2">
+            {editingCat && (
+              <button
+                type="button"
+                onClick={() => { setEditingCat(null); setCatForm({ name: '', color: '#6366f1', icon: 'tag' }) }}
+                className="px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <X size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!catForm.name}
+              onClick={() => createCatMutation.mutate()}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              {editingCat ? <Save size={14} /> : <Plus size={14} />}
+              {editingCat ? 'Zapisz' : 'Dodaj'}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}

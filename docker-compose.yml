@@ -1,0 +1,30 @@
+services:
+  habit-tracker:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - habit-data:/data
+      - habit-backups:/backups
+    environment:
+      # Auth
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+
+      # Timezone
+      - TZ=${TZ:-Europe/Warsaw}
+
+      # SMTP (optional)
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_TLS=${SMTP_TLS:-true}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - NOTIFICATION_EMAIL=${NOTIFICATION_EMAIL:-}
+    restart: unless-stopped
+
+volumes:
+  habit-data:
+  habit-backups:
