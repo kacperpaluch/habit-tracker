@@ -115,6 +115,7 @@ class HabitStats(BaseModel):
     completion_rate_week: float
     completion_rate_month: float
     total_completions: int
+    momentum: int = 0
 
 class HeatmapEntry(BaseModel):
     date: str

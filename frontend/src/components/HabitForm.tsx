@@ -25,6 +25,8 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
     time_of_day: habit?.time_of_day ?? '' as string,
     reminder_time: habit?.reminder_time ?? '',
     is_paused: habit?.is_paused ?? false,
+    pause_start: habit?.pause_start ?? '',
+    pause_end: habit?.pause_end ?? '',
   })
 
   const [weeklyTimes, setWeeklyTimes] = useState(
@@ -63,6 +65,8 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
       time_of_day: (form.time_of_day as Habit['time_of_day']) || null,
       reminder_time: form.reminder_time || null,
       is_paused: form.is_paused,
+      pause_start: form.is_paused && form.pause_start ? form.pause_start : null,
+      pause_end: form.is_paused && form.pause_end ? form.pause_end : null,
     })
   }
 
@@ -254,15 +258,40 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
           </div>
 
           {/* Pause */}
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.is_paused}
-              onChange={e => set('is_paused', e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Nawyk wstrzymany (pauza)</span>
-          </label>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_paused}
+                onChange={e => set('is_paused', e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Nawyk wstrzymany (pauza)</span>
+            </label>
+            {form.is_paused && (
+              <div className="grid grid-cols-2 gap-4 pl-7">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pauza od</label>
+                  <input
+                    type="date"
+                    value={form.pause_start}
+                    onChange={e => set('pause_start', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pauza do (opcjonalnie)</label>
+                  <input
+                    type="date"
+                    value={form.pause_end}
+                    onChange={e => set('pause_end', e.target.value)}
+                    min={form.pause_start || undefined}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Submit */}
           <div className="flex gap-3 pt-2">

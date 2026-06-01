@@ -36,11 +36,12 @@ def create_entry(data: EntryCreate, db: Session = Depends(get_db), _=Depends(get
 
     existing = db.query(Entry).filter(Entry.habit_id == data.habit_id, Entry.date == data.date).first()
     if existing:
-        # For quantitative habits: increment; for binary: update value
-        if habit.mode == "quantitative":
-            existing.value += data.value
-        else:
-            existing.value = data.value
+        # value=0 means "note only" — never overwrite a real completion
+        if data.value > 0:
+            if habit.mode == "quantitative":
+                existing.value += data.value
+            else:
+                existing.value = data.value
         if data.note:
             existing.note = data.note
         db.commit()

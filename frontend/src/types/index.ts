@@ -46,6 +46,12 @@ export interface HabitStats {
   completion_rate_week: number
   completion_rate_month: number
   total_completions: number
+  momentum: number
+}
+
+export interface MomentumPoint {
+  date: string
+  momentum: number
 }
 
 export interface HeatmapEntry {

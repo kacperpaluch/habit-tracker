@@ -16,12 +16,11 @@ def get_scheduled_dates(habit: Habit, start: date, end: date) -> List[date]:
         if stype == "daily":
             scheduled = True
         elif stype == "weekly_x":
-            # Count Mon as start of week; schedule first N days per week
-            # We spread evenly — just track week number
-            week_start = current - timedelta(days=current.weekday())
-            week_days = [week_start + timedelta(days=i) for i in range(7)]
-            times = params.get("times", 1)
-            scheduled = current in week_days[:times]
+            # Distribute N sessions evenly across the week (Mon=0..Sun=6)
+            times = max(1, min(7, int(params.get("times", 1))))
+            step = 7 / times
+            scheduled_weekdays = {int(i * step) for i in range(times)}
+            scheduled = current.weekday() in scheduled_weekdays
         elif stype == "weekly_days":
             # days is list of weekday ints: 0=Mon..6=Sun
             days = params.get("days", [])
@@ -51,47 +50,125 @@ def is_paused_on(habit: Habit, d: date) -> bool:
 
 def compute_streak(habit: Habit, entries: List[Entry], today: date) -> tuple[int, int]:
     """Returns (current_streak, longest_streak)."""
-    entry_dates = {e.date for e in entries}
+    entry_dates = {e.date for e in entries if e.value > 0}
 
-    # Build list of scheduled dates from habit creation up to today
-    start = habit.created_at.date() if habit.created_at else today - timedelta(days=365)
+    creation_start = habit.created_at.date() if habit.created_at else today - timedelta(days=365)
+    earliest_entry = min(entry_dates) if entry_dates else creation_start
+    start = min(creation_start, earliest_entry)
     all_scheduled = get_scheduled_dates(habit, start, today)
 
-    current = 0
-    longest = 0
+    # Current streak: walk backwards; today not yet done is skipped (no penalty)
     streak = 0
-    # Walk backwards for current streak
     for d in reversed(all_scheduled):
         if is_paused_on(habit, d):
-            continue  # paused days don't break streak
+            continue
         if d in entry_dates:
             streak += 1
-            if d == today or d == today - timedelta(days=1):
-                current = streak
+        elif d == today:
+            continue  # today still pending — don't break streak
         else:
-            if d < today:  # missed day in the past
-                break
+            break     # missed a past scheduled day — streak ends
+    current = streak
+
     # Longest streak: walk forward
     streak = 0
+    longest = 0
     for d in all_scheduled:
         if is_paused_on(habit, d):
             continue
         if d in entry_dates:
             streak += 1
             longest = max(longest, streak)
-        else:
-            if d < today:
-                streak = 0
+        elif d < today:
+            streak = 0
     return current, longest
 
 
 def completion_rate(habit: Habit, entries: List[Entry], start: date, end: date) -> float:
-    entry_dates = {e.date for e in entries}
+    entry_dates = {e.date for e in entries if e.value > 0}
     scheduled = [d for d in get_scheduled_dates(habit, start, end) if not is_paused_on(habit, d)]
     if not scheduled:
         return 0.0
     done = sum(1 for d in scheduled if d in entry_dates)
     return round(done / len(scheduled) * 100, 1)
+
+
+def compute_momentum(habit: Habit, entries: List[Entry], today: date) -> int:
+    """
+    Triangular-number accumulation:
+      each consecutive done day adds +N (N = length of current done run)
+      each consecutive missed day subtracts -N (N = length of current miss run)
+    Missing one day costs only -1; a long run of misses escalates quickly.
+    Today is not penalised if not yet done.
+    """
+    entry_dates = {e.date for e in entries if e.value > 0}
+    creation_start = habit.created_at.date() if habit.created_at else today - timedelta(days=365)
+    earliest_entry = min(entry_dates) if entry_dates else creation_start
+    start = min(creation_start, earliest_entry)
+    all_scheduled = get_scheduled_dates(habit, start, today)
+
+    momentum = 0
+    consecutive_done = 0
+    consecutive_missed = 0
+
+    for d in all_scheduled:
+        if is_paused_on(habit, d):
+            continue
+        if d in entry_dates:
+            consecutive_done += 1
+            consecutive_missed = 0
+            momentum += consecutive_done
+        elif d < today:          # past scheduled day not done = missed
+            consecutive_missed += 1
+            consecutive_done = 0
+            momentum -= consecutive_missed
+        # today not yet done → pending, no penalty
+
+    return momentum
+
+
+def get_momentum_history(habit: Habit, entries: List[Entry], today: date, days: int = 90) -> List[Dict]:
+    """Return daily momentum value for the last `days` days."""
+    entry_dates = {e.date for e in entries if e.value > 0}
+    creation_start = habit.created_at.date() if habit.created_at else today - timedelta(days=365)
+    earliest_entry = min(entry_dates) if entry_dates else creation_start
+    start = min(creation_start, earliest_entry)
+    all_scheduled = get_scheduled_dates(habit, start, today)
+
+    # Replay algorithm, recording momentum after each scheduled day
+    momentum = 0
+    consecutive_done = 0
+    consecutive_missed = 0
+    momentum_at: Dict[date, int] = {}
+
+    for d in all_scheduled:
+        if is_paused_on(habit, d):
+            momentum_at[d] = momentum
+            continue
+        if d in entry_dates:
+            consecutive_done += 1
+            consecutive_missed = 0
+            momentum += consecutive_done
+        elif d < today:
+            consecutive_missed += 1
+            consecutive_done = 0
+            momentum -= consecutive_missed
+        momentum_at[d] = momentum
+
+    # Build a daily series; non-scheduled days carry the last known value
+    result_start = today - timedelta(days=days - 1)
+    result = []
+    last_val = 0
+
+    for i in range(days):
+        d = result_start + timedelta(days=i)
+        if d > today:
+            break
+        if d in momentum_at:
+            last_val = momentum_at[d]
+        result.append({"date": d.isoformat(), "momentum": last_val})
+
+    return result
 
 
 def get_heatmap(habit_id: int, db: Session, year: int) -> List[Dict]:
@@ -104,8 +181,9 @@ def get_heatmap(habit_id: int, db: Session, year: int) -> List[Dict]:
     )
     result = {}
     for e in entries:
-        key = e.date.isoformat()
-        result[key] = result.get(key, 0) + 1
+        if e.value > 0:
+            key = e.date.isoformat()
+            result[key] = result.get(key, 0) + 1
     return [{"date": k, "count": v} for k, v in sorted(result.items())]
 
 
@@ -121,6 +199,7 @@ def get_all_habits_heatmap(db: Session, year: int) -> List[Dict]:
     )
     result = {}
     for e in entries:
-        key = e.date.isoformat()
-        result[key] = result.get(key, 0) + 1
+        if e.value > 0:
+            key = e.date.isoformat()
+            result[key] = result.get(key, 0) + 1
     return [{"date": k, "count": v} for k, v in sorted(result.items())]

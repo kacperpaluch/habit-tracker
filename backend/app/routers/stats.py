@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import date, timedelta
@@ -11,11 +11,37 @@ from .. import stats as stats_lib
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
+@router.get("/all-habits", response_model=List[HabitStats])
+def all_habits_stats(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Return stats for all active habits in a single request."""
+    habits = db.query(Habit).filter(Habit.is_active == True).all()
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    result = []
+    for habit in habits:
+        entries = db.query(Entry).filter(Entry.habit_id == habit.id).all()
+        current_streak, longest_streak = stats_lib.compute_streak(habit, entries, today)
+        rate_week = stats_lib.completion_rate(habit, entries, week_start, today)
+        rate_month = stats_lib.completion_rate(habit, entries, month_start, today)
+        momentum = stats_lib.compute_momentum(habit, entries, today)
+        result.append(HabitStats(
+            habit_id=habit.id,
+            habit_name=habit.name,
+            current_streak=current_streak,
+            longest_streak=longest_streak,
+            completion_rate_week=rate_week,
+            completion_rate_month=rate_month,
+            total_completions=len(entries),
+            momentum=momentum,
+        ))
+    return result
+
+
 @router.get("/habits/{habit_id}", response_model=HabitStats)
 def habit_stats(habit_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
     if not habit:
-        from fastapi import HTTPException
         raise HTTPException(404, "Habit not found")
 
     entries = db.query(Entry).filter(Entry.habit_id == habit_id).all()
@@ -26,6 +52,7 @@ def habit_stats(habit_id: int, db: Session = Depends(get_db), _=Depends(get_curr
     current_streak, longest_streak = stats_lib.compute_streak(habit, entries, today)
     rate_week = stats_lib.completion_rate(habit, entries, week_start, today)
     rate_month = stats_lib.completion_rate(habit, entries, month_start, today)
+    momentum = stats_lib.compute_momentum(habit, entries, today)
 
     return HabitStats(
         habit_id=habit_id,
@@ -35,7 +62,23 @@ def habit_stats(habit_id: int, db: Session = Depends(get_db), _=Depends(get_curr
         completion_rate_week=rate_week,
         completion_rate_month=rate_month,
         total_completions=len(entries),
+        momentum=momentum,
     )
+
+
+@router.get("/momentum/{habit_id}")
+def habit_momentum_history(
+    habit_id: int,
+    days: int = Query(default=90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    habit = db.query(Habit).filter(Habit.id == habit_id).first()
+    if not habit:
+        raise HTTPException(404, "Habit not found")
+    entries = db.query(Entry).filter(Entry.habit_id == habit_id).all()
+    today = date.today()
+    return stats_lib.get_momentum_history(habit, entries, today, days)
 
 
 @router.get("/heatmap", response_model=List[HeatmapEntry])
@@ -60,7 +103,6 @@ def habit_calendar(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    from fastapi import HTTPException
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
     if not habit:
         raise HTTPException(404, "Habit not found")
@@ -87,7 +129,7 @@ def habit_calendar(
         paused = stats_lib.is_paused_on(habit, current)
         result.append(CalendarDay(
             date=current.isoformat(),
-            completed=bool(entry),
+            completed=bool(entry) and (entry.value > 0 if entry else False),
             value=entry.value if entry else None,
             note=entry.note if entry else None,
             paused=paused,
@@ -104,7 +146,7 @@ def daily_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
     habits = db.query(Habit).filter(Habit.is_active == True).all()
     entries_today = {
         e.habit_id: e
-        for e in db.query(Entry).filter(Entry.date == today).all()
+        for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
     }
 
     total = 0
