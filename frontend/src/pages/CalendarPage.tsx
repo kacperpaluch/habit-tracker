@@ -104,8 +104,8 @@ export default function CalendarPage() {
                     isToday && 'ring-2 ring-primary-400',
                     info?.paused && 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
                     info?.completed && !info.paused && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-                    !info?.completed && !info?.paused && dateStr <= format(new Date(), 'yyyy-MM-dd') && 'text-red-400 bg-red-50 dark:bg-red-900/10',
-                    !info && 'text-gray-600 dark:text-gray-400'
+                    info?.scheduled && !info.completed && !info.paused && dateStr < format(new Date(), 'yyyy-MM-dd') && 'text-red-400 bg-red-50 dark:bg-red-900/10',
+                    (!info || (!info.completed && !info.paused && !(info.scheduled && dateStr < format(new Date(), 'yyyy-MM-dd')))) && 'text-gray-600 dark:text-gray-400'
                   )}
                 >
                   {day}

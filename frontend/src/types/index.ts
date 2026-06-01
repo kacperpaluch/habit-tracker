@@ -10,7 +10,6 @@ export interface Habit {
   id: number
   name: string
   description: string
-  is_negative: boolean
   mode: 'binary' | 'quantitative'
   goal_value: number | null
   goal_unit: string | null
@@ -65,6 +64,7 @@ export interface CalendarDay {
   value: number | null
   note: string | null
   paused: boolean
+  scheduled: boolean
 }
 
 export interface Settings {

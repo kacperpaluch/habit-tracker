@@ -22,7 +22,6 @@ class Habit(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, default="")
-    is_negative = Column(Boolean, default=False)  # True = "don't do" habit
     mode = Column(String, default="binary")  # binary | quantitative
     goal_value = Column(Float, nullable=True)
     goal_unit = Column(String, nullable=True)

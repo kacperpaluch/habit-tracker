@@ -31,7 +31,7 @@ def _export_data(db: Session) -> dict:
         "habits": [
             {
                 "id": h.id, "name": h.name, "description": h.description,
-                "is_negative": h.is_negative, "mode": h.mode,
+                "mode": h.mode,
                 "goal_value": h.goal_value, "goal_unit": h.goal_unit,
                 "category_id": h.category_id, "schedule_type": h.schedule_type,
                 "schedule_params": h.schedule_params, "time_of_day": h.time_of_day,
@@ -72,55 +72,60 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
     except Exception:
         raise HTTPException(400, "Invalid JSON file")
 
-    # Clear existing data
-    db.query(Entry).delete()
-    db.query(Habit).delete()
-    db.query(Category).delete()
-    db.commit()
-
-    # Re-insert categories
-    cat_map = {}
-    for c in data.get("categories", []):
-        cat = Category(name=c["name"], color=c.get("color", "#6366f1"), icon=c.get("icon", "tag"))
-        db.add(cat)
+    from datetime import datetime as dt, date as date_type
+    try:
+        # Single transaction: if anything fails, nothing is wiped
+        db.query(Entry).delete()
+        db.query(Habit).delete()
+        db.query(Category).delete()
         db.flush()
-        cat_map[c["id"]] = cat.id
 
-    # Re-insert habits
-    habit_map = {}
-    for h in data.get("habits", []):
-        from datetime import datetime as dt
-        habit = Habit(
-            name=h["name"], description=h.get("description", ""),
-            is_negative=h.get("is_negative", False), mode=h.get("mode", "binary"),
-            goal_value=h.get("goal_value"), goal_unit=h.get("goal_unit"),
-            category_id=cat_map.get(h.get("category_id")),
-            schedule_type=h.get("schedule_type", "daily"),
-            schedule_params=h.get("schedule_params", {}),
-            time_of_day=h.get("time_of_day"), reminder_time=h.get("reminder_time"),
-            is_active=h.get("is_active", True), is_paused=h.get("is_paused", False),
-            order=h.get("order", 0),
-        )
-        if h.get("created_at"):
-            habit.created_at = dt.fromisoformat(h["created_at"])
-        db.add(habit)
-        db.flush()
-        habit_map[h["id"]] = habit.id
+        # Re-insert categories
+        cat_map = {}
+        for c in data.get("categories", []):
+            cat = Category(name=c["name"], color=c.get("color", "#6366f1"), icon=c.get("icon", "tag"))
+            db.add(cat)
+            db.flush()
+            cat_map[c["id"]] = cat.id
 
-    # Re-insert entries
-    from datetime import date as date_type
-    for e in data.get("entries", []):
-        if e["habit_id"] not in habit_map:
-            continue
-        entry = Entry(
-            habit_id=habit_map[e["habit_id"]],
-            date=date_type.fromisoformat(e["date"]),
-            value=e.get("value", 1.0),
-            note=e.get("note", ""),
-        )
-        db.add(entry)
+        # Re-insert habits
+        habit_map = {}
+        for h in data.get("habits", []):
+            habit = Habit(
+                name=h["name"], description=h.get("description", ""),
+                mode=h.get("mode", "binary"),
+                goal_value=h.get("goal_value"), goal_unit=h.get("goal_unit"),
+                category_id=cat_map.get(h.get("category_id")),
+                schedule_type=h.get("schedule_type", "daily"),
+                schedule_params=h.get("schedule_params", {}),
+                time_of_day=h.get("time_of_day"), reminder_time=h.get("reminder_time"),
+                is_active=h.get("is_active", True), is_paused=h.get("is_paused", False),
+                order=h.get("order", 0),
+            )
+            if h.get("created_at"):
+                habit.created_at = dt.fromisoformat(h["created_at"])
+            db.add(habit)
+            db.flush()
+            habit_map[h["id"]] = habit.id
 
-    db.commit()
+        # Re-insert entries
+        for e in data.get("entries", []):
+            if e["habit_id"] not in habit_map:
+                continue
+            entry = Entry(
+                habit_id=habit_map[e["habit_id"]],
+                date=date_type.fromisoformat(e["date"]),
+                value=e.get("value", 1.0),
+                note=e.get("note", ""),
+            )
+            db.add(entry)
+
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(400, f"Import failed: {e}")
 
 
 @router.get("/list", response_model=List[BackupInfo])

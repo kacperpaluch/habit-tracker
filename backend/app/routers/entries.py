@@ -60,7 +60,7 @@ def update_entry(entry_id: int, data: EntryUpdate, db: Session = Depends(get_db)
     entry = db.query(Entry).filter(Entry.id == entry_id).first()
     if not entry:
         raise HTTPException(404, "Entry not found")
-    for k, v in data.model_dump(exclude_none=True).items():
+    for k, v in data.model_dump(exclude_unset=True).items():
         setattr(entry, k, v)
     db.commit()
     db.refresh(entry)

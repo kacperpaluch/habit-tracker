@@ -31,7 +31,6 @@ class CategoryOut(CategoryBase):
 class HabitBase(BaseModel):
     name: str
     description: str = ""
-    is_negative: bool = False
     mode: str = "binary"
     goal_value: Optional[float] = None
     goal_unit: Optional[str] = None
@@ -48,7 +47,6 @@ class HabitCreate(HabitBase):
 class HabitUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    is_negative: Optional[bool] = None
     mode: Optional[str] = None
     goal_value: Optional[float] = None
     goal_unit: Optional[str] = None
@@ -127,6 +125,7 @@ class CalendarDay(BaseModel):
     value: Optional[float] = None
     note: Optional[str] = None
     paused: bool = False
+    scheduled: bool = False
 
 
 # --- Auth ---

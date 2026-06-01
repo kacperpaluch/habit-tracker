@@ -48,7 +48,7 @@ def update_habit(habit_id: int, data: HabitUpdate, db: Session = Depends(get_db)
     habit = db.query(Habit).options(joinedload(Habit.category)).filter(Habit.id == habit_id).first()
     if not habit:
         raise HTTPException(404, "Habit not found")
-    for k, v in data.model_dump(exclude_none=True).items():
+    for k, v in data.model_dump(exclude_unset=True).items():
         setattr(habit, k, v)
     db.commit()
     db.refresh(habit)

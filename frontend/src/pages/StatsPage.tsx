@@ -78,8 +78,8 @@ export default function StatsPage() {
 
             {/* Completion rates */}
             <div className="mt-2 flex gap-2 text-xs text-gray-500">
-              <span>7d: <strong>{s.completion_rate_week}%</strong></span>
-              <span>30d: <strong>{s.completion_rate_month}%</strong></span>
+              <span>Tydz.: <strong>{s.completion_rate_week}%</strong></span>
+              <span>Mies.: <strong>{s.completion_rate_month}%</strong></span>
             </div>
 
             {/* Momentum */}
@@ -214,7 +214,7 @@ export default function StatsPage() {
                 </span>
                 {current > 0 && (
                   <span className="text-xs text-gray-400">
-                    · kolejny dzień wykona da +{momentumHistory.filter(p => p.momentum === current).length + 1}
+                    · każdy kolejny wykonany dzień dokłada coraz więcej
                   </span>
                 )}
               </div>
@@ -256,8 +256,8 @@ export default function StatsPage() {
                   <th className="text-left px-5 py-2.5 font-medium text-gray-600 dark:text-gray-400">Nawyk</th>
                   <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Streak</th>
                   <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Rekord</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">7 dni</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">30 dni</th>
+                  <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Tydzień</th>
+                  <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Miesiąc</th>
                   <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Rytm</th>
                   <th className="text-center px-4 py-2.5 font-medium text-gray-600 dark:text-gray-400">Razem</th>
                 </tr>

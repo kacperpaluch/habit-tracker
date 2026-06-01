@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, timedelta
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
@@ -11,23 +12,30 @@ def get_scheduled_dates(habit: Habit, start: date, end: date) -> List[date]:
     stype = habit.schedule_type
     params = habit.schedule_params or {}
 
+    # Precompute fixed sets (independent of the iterated date)
+    weekly_x_days = None
+    if stype == "weekly_x":
+        # Distribute N sessions evenly across the week (Mon=0..Sun=6)
+        times = max(1, min(7, int(params.get("times", 1))))
+        step = 7 / times
+        weekly_x_days = {int(i * step) for i in range(times)}
+    weekly_days = set(params.get("days", [])) if stype == "weekly_days" else None
+
     while current <= end:
         scheduled = False
         if stype == "daily":
             scheduled = True
         elif stype == "weekly_x":
-            # Distribute N sessions evenly across the week (Mon=0..Sun=6)
-            times = max(1, min(7, int(params.get("times", 1))))
-            step = 7 / times
-            scheduled_weekdays = {int(i * step) for i in range(times)}
-            scheduled = current.weekday() in scheduled_weekdays
+            scheduled = current.weekday() in weekly_x_days
         elif stype == "weekly_days":
-            # days is list of weekday ints: 0=Mon..6=Sun
-            days = params.get("days", [])
-            scheduled = current.weekday() in days
+            scheduled = current.weekday() in weekly_days
         elif stype == "monthly_x":
-            times = params.get("times", 1)
-            scheduled = current.day <= times
+            # Distribute N sessions evenly across the month (1st of every step)
+            days_in_month = calendar.monthrange(current.year, current.month)[1]
+            times = max(1, min(days_in_month, int(params.get("times", 1))))
+            step = days_in_month / times
+            scheduled_days = {int(i * step) + 1 for i in range(times)}
+            scheduled = current.day in scheduled_days
 
         if scheduled:
             result.append(current)
@@ -45,7 +53,10 @@ def is_paused_on(habit: Habit, d: date) -> bool:
         return ps <= d <= pe
     if ps:
         return d >= ps
-    return False
+    if pe:
+        return d <= pe
+    # Paused with no dates → indefinite freeze while is_paused is set
+    return True
 
 
 def compute_streak(habit: Habit, entries: List[Entry], today: date) -> tuple[int, int]:

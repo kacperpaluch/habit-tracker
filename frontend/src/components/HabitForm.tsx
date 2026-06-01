@@ -15,7 +15,6 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
   const [form, setForm] = useState({
     name: habit?.name ?? '',
     description: habit?.description ?? '',
-    is_negative: habit?.is_negative ?? false,
     mode: habit?.mode ?? 'binary' as 'binary' | 'quantitative',
     goal_value: habit?.goal_value?.toString() ?? '',
     goal_unit: habit?.goal_unit ?? '',
@@ -55,7 +54,6 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
     onSave({
       name: form.name,
       description: form.description,
-      is_negative: form.is_negative,
       mode: form.mode,
       goal_value: form.mode === 'quantitative' ? parseFloat(form.goal_value) || null : null,
       goal_unit: form.mode === 'quantitative' ? form.goal_unit || null : null,
@@ -107,30 +105,17 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
             />
           </div>
 
-          {/* Type + Mode */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Typ nawyku</label>
-              <select
-                value={form.is_negative ? 'negative' : 'positive'}
-                onChange={e => set('is_negative', e.target.value === 'negative')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              >
-                <option value="positive">Pozytywny (rób)</option>
-                <option value="negative">Negatywny (unikaj)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tryb</label>
-              <select
-                value={form.mode}
-                onChange={e => set('mode', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              >
-                <option value="binary">Tak/Nie</option>
-                <option value="quantitative">Ilościowy</option>
-              </select>
-            </div>
+          {/* Mode */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tryb</label>
+            <select
+              value={form.mode}
+              onChange={e => set('mode', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            >
+              <option value="binary">Tak/Nie</option>
+              <option value="quantitative">Ilościowy</option>
+            </select>
           </div>
 
           {/* Goal (quantitative) */}

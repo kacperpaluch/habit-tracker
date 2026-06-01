@@ -1,6 +1,6 @@
 import os
 import json
-import shutil
+import sqlite3
 import logging
 from datetime import datetime, date, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -63,7 +63,16 @@ async def run_backup():
         src = os.path.join(DATA_DIR, "habits.db")
         dst = os.path.join(BACKUP_DIR, f"habits_{timestamp}.db")
         if os.path.exists(src):
-            shutil.copy2(src, dst)
+            # Use SQLite's online backup API so the copy is consistent and
+            # includes data still sitting in the WAL file (shutil.copy2 would not).
+            src_conn = sqlite3.connect(src)
+            dst_conn = sqlite3.connect(dst)
+            try:
+                with dst_conn:
+                    src_conn.backup(dst_conn)
+            finally:
+                src_conn.close()
+                dst_conn.close()
             logger.info(f"Backup created: {dst}")
 
         # Prune old backups
@@ -117,15 +126,19 @@ def setup_scheduler(app=None):
 def reschedule(settings: Settings):
     tz = settings.timezone or "UTC"
     h, m = (settings.daily_summary_time or "08:00").split(":")
-    scheduler.reschedule_job(
-        "daily_summary",
+    scheduler.add_job(
+        run_daily_summary,
         CronTrigger(hour=int(h), minute=int(m), timezone=tz),
+        id="daily_summary",
+        replace_existing=True,
     )
     parts = (settings.backup_cron or "0 3 * * *").split()
-    scheduler.reschedule_job(
-        "auto_backup",
+    scheduler.add_job(
+        run_backup,
         CronTrigger(
             minute=parts[0], hour=parts[1], day=parts[2],
             month=parts[3], day_of_week=parts[4], timezone=tz,
         ),
+        id="auto_backup",
+        replace_existing=True,
     )

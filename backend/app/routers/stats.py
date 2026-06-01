@@ -133,6 +133,7 @@ def habit_calendar(
             value=entry.value if entry else None,
             note=entry.note if entry else None,
             paused=paused,
+            scheduled=current in scheduled,
         ))
         current += timedelta(days=1)
 

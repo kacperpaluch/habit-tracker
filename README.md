@@ -4,10 +4,9 @@ Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Dział
 
 ## Funkcje
 
-- **Nawyki pozytywne i negatywne** — „rób codziennie" lub „unikaj"
 - **Tryb binarny i ilościowy** — tak/nie lub cel liczbowy z inkrementalnym dodawaniem
-- **Elastyczny harmonogram** — codziennie, X razy w tygodniu, konkretne dni, X razy w miesiącu
-- **Pauza/zamrożenie z datami** — urlop lub choroba nie psuje streaka; można ustawić przedział "od–do"
+- **Elastyczny harmonogram** — codziennie, X razy w tygodniu, konkretne dni, X razy w miesiącu (rozłożone równomiernie)
+- **Pauza/zamrożenie** — urlop lub choroba nie psuje streaka; opcjonalny przedział "od–do", a bez podanych dat pauza obowiązuje bezterminowo (dopóki włączona)
 - **Uzupełnianie wstecz** — odznaczanie poprzednich dni z interfejsu
 - **Notatki do wpisów** — adnotacja przy każdym wpisie: zarówno po wykonaniu nawyku, jak i przy pominięciu (np. "dlaczego dziś nie?")
 - **Kategorie** z kolorem — grupowanie nawyków w widoku dziennym
@@ -165,8 +164,8 @@ Frontend deweloperski dostępny pod http://localhost:5173
 ## Backup i odtwarzanie danych
 
 **Automatyczny backup** (domyślnie o 3:00 w nocy, przechowuje 10 ostatnich kopii):
-- Pliki `.db` w wolumenie `/backups`
-- Konfigurowany przez cron expression w Ustawieniach
+- Spójne migawki `.db` w wolumenie `/backups` (przez SQLite Online Backup API — bezpieczne przy włączonym trybie WAL)
+- Konfigurowany przez cron expression w Ustawieniach (zmiana działa od razu, bez restartu kontenera)
 
 **Eksport/Import JSON** (pełny stan: kategorie + nawyki + wpisy):
 - Eksport: Ustawienia → Eksportuj dane (JSON)
@@ -185,15 +184,22 @@ docker run --rm -v habit-data:/data -v habit-backups:/backups alpine \
 docker compose up -d
 ```
 
-## Harmonogram `weekly_x` — jak działa
+## Harmonogram — jak działa
 
-Nawyk „X razy w tygodniu" rozkłada sesje równomiernie na cały tydzień, np.:
+Nawyk „X razy w tygodniu" (`weekly_x`) rozkłada sesje równomiernie na cały tydzień, np.:
 
 | Częstotliwość | Planowane dni |
 |---------------|---------------|
 | 2×/tydzień | Pon, Czw |
 | 3×/tydzień | Pon, Śr, Pt |
 | 5×/tydzień | Pon, Wt, Śr, Pt, Sob |
+
+Analogicznie „X razy w miesiącu" (`monthly_x`) rozkłada sesje równomiernie na dni miesiąca, np.:
+
+| Częstotliwość | Planowane dni |
+|---------------|---------------|
+| 2×/miesiąc | 1., 16. |
+| 3×/miesiąc | 1., 11., 21. |
 
 Streak i % realizacji są liczone względem tych dni — jeśli zrobisz nawyk w zaplanowany dzień, streak się utrzymuje.
 
