@@ -77,7 +77,7 @@ class Settings(Base):
 
     backup_enabled = Column(Boolean, default=True)
     backup_retention = Column(Integer, default=10)
-    backup_cron = Column(String, default="0 3 * * *")
+    backup_cron = Column(String, default="0 4 * * *")
 
     daily_summary_time = Column(String, default="08:00")
     daily_summary_enabled = Column(Boolean, default=False)

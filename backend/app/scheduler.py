@@ -96,7 +96,7 @@ def setup_scheduler(app=None):
         settings = db.query(Settings).first()
         tz = settings.timezone if settings else "UTC"
         summary_time = settings.daily_summary_time if settings else "08:00"
-        backup_cron = settings.backup_cron if settings else "0 3 * * *"
+        backup_cron = settings.backup_cron if settings else "0 4 * * *"
     finally:
         db.close()
 
@@ -132,7 +132,7 @@ def reschedule(settings: Settings):
         id="daily_summary",
         replace_existing=True,
     )
-    parts = (settings.backup_cron or "0 3 * * *").split()
+    parts = (settings.backup_cron or "0 4 * * *").split()
     scheduler.add_job(
         run_backup,
         CronTrigger(

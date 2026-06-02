@@ -58,6 +58,12 @@ export default function SettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
   })
 
+  const restoreServerMutation = useMutation({
+    mutationFn: backupApi.restoreFromServer,
+    onSuccess: () => { qc.invalidateQueries(); toast.success('Backup przywrócony! Odśwież stronę.') },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Błąd przywracania'),
+  })
+
   const createCatMutation = useMutation({
     mutationFn: () => editingCat
       ? categoriesApi.update(editingCat.id, catForm)
@@ -94,6 +100,20 @@ export default function SettingsPage() {
       qc.invalidateQueries()
       toast.success('Import zakończony pomyślnie!')
     }).catch(() => toast.error('Błąd importu'))
+    e.target.value = ''
+  }
+
+  const handleRestoreDb = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!confirm('Wczytać plik „' + file.name + '" i natychmiast przywrócić bazę danych?\nBieżące dane zostaną nadpisane.')) {
+      e.target.value = ''
+      return
+    }
+    backupApi.restoreDb(file).then(() => {
+      qc.invalidateQueries()
+      toast.success('Baza przywrócona! Odśwież stronę.')
+    }).catch(() => toast.error('Błąd przywracania pliku .db'))
     e.target.value = ''
   }
 
@@ -222,15 +242,19 @@ export default function SettingsPage() {
               <Download size={15} /> Eksportuj dane (JSON)
             </button>
             <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-pointer">
-              <Upload size={15} /> Importuj dane
+              <Upload size={15} /> Importuj JSON
               <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+            </label>
+            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-pointer">
+              <Upload size={15} /> Wczytaj plik .db z dysku
+              <input type="file" accept=".db" className="hidden" onChange={handleRestoreDb} />
             </label>
           </div>
 
           {backups.length > 0 && (
             <div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zapisane backupy</p>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
+              <div className="space-y-1 max-h-56 overflow-y-auto">
                 {backups.map(b => (
                   <div key={b.filename} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs">
                     <span className="text-gray-700 dark:text-gray-300 font-mono truncate">{b.filename}</span>
@@ -238,6 +262,29 @@ export default function SettingsPage() {
                       <span className="text-gray-400">{(b.size / 1024).toFixed(1)} KB</span>
                       <button
                         type="button"
+                        title="Pobierz"
+                        onClick={() => backupApi.download(b.filename)}
+                        className="text-blue-400 hover:text-blue-600"
+                      >
+                        <Download size={12} />
+                      </button>
+                      {b.filename.endsWith('.db') && (
+                        <button
+                          type="button"
+                          title="Przywróć"
+                          onClick={() => {
+                            if (confirm('Przywrócić backup „' + b.filename + '"?\nBieżące dane zostaną nadpisane.'))
+                              restoreServerMutation.mutate(b.filename)
+                          }}
+                          className="text-amber-400 hover:text-amber-600"
+                          disabled={restoreServerMutation.isPending}
+                        >
+                          <Upload size={12} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        title="Usuń"
                         onClick={() => deleteBkMutation.mutate(b.filename)}
                         className="text-red-400 hover:text-red-600"
                       >

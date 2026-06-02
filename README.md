@@ -202,22 +202,24 @@ Frontend deweloperski dostępny pod http://localhost:5173
 
 ## Backup i odtwarzanie danych
 
-**Automatyczny backup** (domyślnie o 3:00 w nocy, przechowuje 10 ostatnich kopii):
+**Automatyczny backup** (domyślnie o 4:00 w nocy, przechowuje 10 ostatnich kopii):
 - Spójne migawki `.db` w wolumenie `/backups` (przez SQLite Online Backup API — bezpieczne przy włączonym trybie WAL)
 - Konfigurowany przez cron expression w Ustawieniach (zmiana działa od razu, bez restartu kontenera)
 
-**Eksport/Import JSON** (pełny stan: kategorie + nawyki + wpisy):
-- Eksport: Ustawienia → Eksportuj dane (JSON)
-- Import: Ustawienia → Importuj dane — **nadpisuje istniejące dane!**
+**Z poziomu interfejsu** (Ustawienia → sekcja Backup):
+- **Eksportuj dane (JSON)** — pobierz pełny eksport danych
+- **Importuj JSON** — przywróć dane z pliku JSON (nadpisuje wszystko)
+- **Wczytaj plik .db z dysku** — upload pliku `.db` i natychmiastowe przywrócenie
+- **Lista backupów** — pliki `.db` (automatyczne) i `.json` (eksporty); każdy można pobrać (⬇), pliki `.db` można też przywrócić (🔼) bezpośrednio z listy
 
-**Odtworzenie po awarii:**
+**Odtworzenie po awarii (bez dostępu do UI):**
 ```bash
 # Zatrzymaj kontener
 docker compose down
 
 # Przywróć plik DB z backupu
 docker run --rm -v habit-data:/data -v habit-backups:/backups alpine \
-  cp /backups/habits_20240101_030000.db /data/habits.db
+  cp /backups/habits_20240101_040000.db /data/habits.db
 
 # Uruchom ponownie
 docker compose up -d

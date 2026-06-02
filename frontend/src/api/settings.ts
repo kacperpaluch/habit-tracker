@@ -11,11 +11,18 @@ export const settingsApi = {
 export const backupApi = {
   list: () => api.get<BackupInfo[]>('/backup/list').then(r => r.data),
   export: () => { window.location.href = '/api/backup/export' },
+  download: (filename: string) => { window.location.href = `/api/backup/download/${encodeURIComponent(filename)}` },
   import: (file: File) => {
     const form = new FormData()
     form.append('file', file)
     return api.post('/backup/import', form)
   },
+  restoreDb: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post('/backup/restore-db', form)
+  },
+  restoreFromServer: (filename: string) => api.post(`/backup/restore/${encodeURIComponent(filename)}`),
   delete: (filename: string) => api.delete(`/backup/${filename}`),
 }
 

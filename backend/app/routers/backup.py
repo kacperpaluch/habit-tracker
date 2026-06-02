@@ -1,12 +1,13 @@
 import os
 import json
-import shutil
+import sqlite3
+import tempfile
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
-from ..database import get_db
+from ..database import get_db, engine, DATABASE_URL
 from ..models import Category, Habit, Entry, Settings
 from ..schemas import BackupInfo
 from ..auth import get_current_user
@@ -14,6 +15,13 @@ from ..auth import get_current_user
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
 BACKUP_DIR = os.getenv("BACKUP_DIR", "/backups")
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+
+
+def _db_file_path() -> str:
+    if DATABASE_URL.startswith("sqlite:///"):
+        return DATABASE_URL[len("sqlite:///"):]
+    return os.path.join(DATA_DIR, "habits.db")
 
 
 def _export_data(db: Session) -> dict:
@@ -133,7 +141,7 @@ def list_backups(_=Depends(get_current_user)):
     os.makedirs(BACKUP_DIR, exist_ok=True)
     files = []
     for fname in os.listdir(BACKUP_DIR):
-        if fname.endswith(".json"):
+        if fname.endswith(".json") or fname.endswith(".db"):
             fpath = os.path.join(BACKUP_DIR, fname)
             stat = os.stat(fpath)
             files.append(BackupInfo(
@@ -142,6 +150,62 @@ def list_backups(_=Depends(get_current_user)):
                 created_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
             ))
     return sorted(files, key=lambda x: x.created_at, reverse=True)
+
+
+@router.get("/download/{filename}")
+def download_backup(filename: str, _=Depends(get_current_user)):
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid filename")
+    fpath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "Backup not found")
+    media = "application/json" if filename.endswith(".json") else "application/octet-stream"
+    return FileResponse(fpath, filename=filename, media_type=media)
+
+
+@router.post("/restore/{filename}")
+def restore_from_server(filename: str, _=Depends(get_current_user)):
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid filename")
+    if not filename.endswith(".db"):
+        raise HTTPException(400, "Tylko pliki .db można przywrócić tą metodą — dla JSON użyj /import")
+    src = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Backup not found")
+    dst = _db_file_path()
+    src_conn = sqlite3.connect(src)
+    dst_conn = sqlite3.connect(dst)
+    try:
+        with dst_conn:
+            src_conn.backup(dst_conn)
+    finally:
+        src_conn.close()
+        dst_conn.close()
+    engine.dispose()
+    return {"ok": True}
+
+
+@router.post("/restore-db", status_code=204)
+async def restore_from_upload_db(file: UploadFile = File(...), _=Depends(get_current_user)):
+    if not file.filename.endswith(".db"):
+        raise HTTPException(400, "Akceptowane są tylko pliki .db")
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        dst = _db_file_path()
+        src_conn = sqlite3.connect(tmp_path)
+        dst_conn = sqlite3.connect(dst)
+        try:
+            with dst_conn:
+                src_conn.backup(dst_conn)
+        finally:
+            src_conn.close()
+            dst_conn.close()
+        engine.dispose()
+    finally:
+        os.unlink(tmp_path)
 
 
 @router.delete("/{filename}", status_code=204)
