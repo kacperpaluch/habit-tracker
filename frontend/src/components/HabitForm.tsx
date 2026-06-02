@@ -21,7 +21,6 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
     category_id: habit?.category_id?.toString() ?? '',
     schedule_type: habit?.schedule_type ?? 'daily' as string,
     schedule_params: habit?.schedule_params ?? {} as Record<string, unknown>,
-    time_of_day: habit?.time_of_day ?? '' as string,
     reminder_time: habit?.reminder_time ?? '',
     is_paused: habit?.is_paused ?? false,
     pause_start: habit?.pause_start ?? '',
@@ -60,7 +59,7 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
       category_id: form.category_id ? parseInt(form.category_id) : null,
       schedule_type: form.schedule_type as Habit['schedule_type'],
       schedule_params,
-      time_of_day: (form.time_of_day as Habit['time_of_day']) || null,
+      time_of_day: null,
       reminder_time: form.reminder_time || null,
       is_paused: form.is_paused,
       pause_start: form.is_paused && form.pause_start ? form.pause_start : null,
@@ -216,30 +215,15 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
             )}
           </div>
 
-          {/* Time of day + Reminder */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pora dnia</label>
-              <select
-                value={form.time_of_day}
-                onChange={e => set('time_of_day', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              >
-                <option value="">Dowolna</option>
-                <option value="morning">Rano</option>
-                <option value="afternoon">Popołudnie</option>
-                <option value="evening">Wieczór</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Godzina przypomnienia</label>
-              <input
-                type="time"
-                value={form.reminder_time}
-                onChange={e => set('reminder_time', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              />
-            </div>
+          {/* Reminder */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Godzina przypomnienia</label>
+            <input
+              type="time"
+              value={form.reminder_time}
+              onChange={e => set('reminder_time', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
           </div>
 
           {/* Pause */}

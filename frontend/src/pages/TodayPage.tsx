@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronLeft, ChevronRight, Calendar, Sunrise, Sun, Moon, Clock, PartyPopper } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper } from 'lucide-react'
 import { format, addDays, subDays, isToday } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -9,13 +9,6 @@ import { categoriesApi } from '../api/categories'
 import HabitCard from '../components/HabitCard'
 import HabitForm from '../components/HabitForm'
 import type { Habit, Entry } from '../types'
-
-const TIME_GROUPS = [
-  { key: 'morning',   label: 'Rano',       Icon: Sunrise },
-  { key: 'afternoon', label: 'Popołudnie',  Icon: Sun     },
-  { key: 'evening',   label: 'Wieczór',    Icon: Moon    },
-  { key: 'none',      label: 'Dowolna',    Icon: Clock   },
-] as const
 
 export default function TodayPage() {
   const qc = useQueryClient()
@@ -100,26 +93,29 @@ export default function TodayPage() {
     },
   })
 
-  // Group by time_of_day
-  const grouped = useMemo(() => {
-    const groups: Record<string, Habit[]> = { morning: [], afternoon: [], evening: [], none: [] }
-    habits.forEach(h => { groups[h.time_of_day ?? 'none'].push(h) })
-    return groups
-  }, [habits])
-
-  const hasAnyTimeGrouping = habits.some(h => h.time_of_day !== null)
-
-  // Done count per group (value > 0 only)
-  const groupCounts = useMemo(() => {
-    const result: Record<string, { done: number; total: number }> = {}
-    Object.entries(grouped).forEach(([key, list]) => {
-      result[key] = {
-        done:  list.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length,
-        total: list.length,
+  // Group by category
+  const groupedByCategory = useMemo(() => {
+    const byId: Record<number, Habit[]> = {}
+    const uncategorized: Habit[] = []
+    habits.forEach(h => {
+      if (h.category_id != null) {
+        if (!byId[h.category_id]) byId[h.category_id] = []
+        byId[h.category_id].push(h)
+      } else {
+        uncategorized.push(h)
       }
     })
+    const result: Array<{ id: number | null; name: string; color: string; habits: Habit[] }> = []
+    categories.forEach(cat => {
+      if (byId[cat.id]?.length) {
+        result.push({ id: cat.id, name: cat.name, color: cat.color, habits: byId[cat.id] })
+      }
+    })
+    if (uncategorized.length) {
+      result.push({ id: null, name: 'Bez kategorii', color: '#9ca3af', habits: uncategorized })
+    }
     return result
-  }, [grouped, entryMap])
+  }, [habits, categories])
 
   const allDone = isCurrentDay && summary && summary.total > 0 && summary.done === summary.total
 
@@ -219,32 +215,32 @@ export default function TodayPage() {
         </div>
       ) : (
         <div className="space-y-5">
-          {TIME_GROUPS.map(({ key, label, Icon }) => {
-            const group = grouped[key]
-            if (!group || group.length === 0) return null
-            const { done: doneCount, total: totalCount } = groupCounts[key]
-            const sectionDone = doneCount === totalCount
+          {groupedByCategory.map(({ id, name, color, habits: groupHabits }) => {
+            const done = groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
+            const total = groupHabits.length
+            const sectionDone = done === total
 
             return (
-              <div key={key}>
-                {hasAnyTimeGrouping && (
+              <div key={id ?? 'uncategorized'}>
+                {groupedByCategory.length > 1 && (
                   <div className="flex items-center gap-2 mb-3">
-                    <div className={`p-1.5 rounded-lg ${sectionDone ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                      <Icon size={14} className={sectionDone ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'} />
-                    </div>
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      {label}
+                      {name}
                     </h3>
                     <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700 ml-1" />
                     <span className={`text-xs font-semibold tabular-nums ${
                       sectionDone ? 'text-green-600 dark:text-green-400' : 'text-gray-400'
                     }`}>
-                      {doneCount}/{totalCount}
+                      {done}/{total}
                     </span>
                   </div>
                 )}
                 <div className="space-y-2">
-                  {group.map(h => (
+                  {groupHabits.map(h => (
                     <HabitCard
                       key={h.id}
                       habit={h}

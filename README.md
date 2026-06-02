@@ -9,8 +9,7 @@ Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Dział
 - **Pauza/zamrożenie** — urlop lub choroba nie psuje streaka; opcjonalny przedział "od–do", a bez podanych dat pauza obowiązuje bezterminowo (dopóki włączona)
 - **Uzupełnianie wstecz** — odznaczanie poprzednich dni z interfejsu
 - **Notatki do wpisów** — adnotacja przy każdym wpisie: zarówno po wykonaniu nawyku, jak i przy pominięciu (np. "dlaczego dziś nie?")
-- **Kategorie** z kolorem — grupowanie nawyków w widoku dziennym
-- **Grupowanie wg pory dnia** — widok dzienny podzielony na Rano / Popołudnie / Wieczór / Dowolna
+- **Kategorie** z kolorem — grupowanie nawyków w widoku dziennym wg kategorii
 - **Streaki** — aktualny i najdłuższy, per nawyk (uwzględnia wpisy wstecz przed datą tworzenia nawyku)
 - **System rytmu (momentum)** — triangularna akumulacja punktów: każdy kolejny wykonany dzień dodaje coraz więcej (+1, +2, +3…), każde pominięcie odejmuje (-1, -2, -3…); widoczny na kartach i w tabeli
 - **Trend rytmu** — wykres AreaChart historii momentum (30/90/180 dni) z linią zerową
@@ -105,14 +104,14 @@ habit-tracker/
 │       ├── api/             # Axios clients dla każdego zasobu
 │       ├── components/
 │       │   ├── HabitCard.tsx  # Karta nawyku z odznaczeniem i polem notatki
-│       │   ├── HabitForm.tsx  # Modal tworzenia/edycji nawyku (z datami pauzy)
+│       │   ├── HabitForm.tsx  # Modal tworzenia/edycji nawyku (kategoria, harmonogram, pauza)
 │       │   ├── Heatmap.tsx    # Heatmapa roczna z interaktywnym tooltipem
 │       │   └── Navbar.tsx     # Górna nawigacja
 │       ├── hooks/
 │       │   ├── useAuth.ts   # Zarządzanie tokenem JWT
 │       │   └── useTheme.ts  # Przełącznik ciemny/jasny motyw
 │       ├── pages/
-│       │   ├── TodayPage.tsx     # Widok dzienny — grupy wg pory dnia
+│       │   ├── TodayPage.tsx     # Widok dzienny — grupy wg kategorii
 │       │   ├── StatsPage.tsx     # Statystyki i heatmapa
 │       │   ├── CalendarPage.tsx  # Kalendarz miesięczny per nawyk
 │       │   └── SettingsPage.tsx  # Ustawienia + kategorie + backup
