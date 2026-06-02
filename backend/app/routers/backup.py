@@ -136,6 +136,34 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
         raise HTTPException(400, f"Import failed: {e}")
 
 
+@router.post("/create-db", status_code=201)
+def create_db_backup(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    settings = db.query(Settings).first()
+    retention = settings.backup_retention if settings else 10
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    src = _db_file_path()
+    if not os.path.exists(src):
+        raise HTTPException(404, "Plik bazy danych nie istnieje")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    dst = os.path.join(BACKUP_DIR, f"habits_{timestamp}.db")
+    src_conn = sqlite3.connect(src)
+    dst_conn = sqlite3.connect(dst)
+    try:
+        with dst_conn:
+            src_conn.backup(dst_conn)
+    finally:
+        src_conn.close()
+        dst_conn.close()
+    db_files = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith("habits_") and f.endswith(".db")])
+    while len(db_files) > retention:
+        old = db_files.pop(0)
+        try:
+            os.remove(os.path.join(BACKUP_DIR, old))
+        except OSError:
+            pass
+    return {"filename": os.path.basename(dst)}
+
+
 @router.get("/list", response_model=List[BackupInfo])
 def list_backups(_=Depends(get_current_user)):
     os.makedirs(BACKUP_DIR, exist_ok=True)

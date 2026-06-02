@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     smtp_host: '', smtp_port: 587, smtp_user: '', smtp_password: '',
     smtp_tls: true, smtp_from: '', notification_email: '',
-    backup_enabled: true, backup_retention: 10, backup_cron: '0 3 * * *',
+    backup_enabled: true, backup_retention: 10, backup_cron: '0 4 * * *',
     daily_summary_time: '08:00', daily_summary_enabled: false,
     timezone: 'UTC', current_password: '', new_password: '', new_password2: '',
   })
@@ -62,6 +62,12 @@ export default function SettingsPage() {
     mutationFn: backupApi.restoreFromServer,
     onSuccess: () => { qc.invalidateQueries(); toast.success('Backup przywrócony! Odśwież stronę.') },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Błąd przywracania'),
+  })
+
+  const createDbBkMutation = useMutation({
+    mutationFn: backupApi.createDbBackup,
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['backups'] }); toast.success(`Backup utworzony: ${r.filename}`) },
+    onError: () => toast.error('Błąd tworzenia backupu'),
   })
 
   const createCatMutation = useMutation({
@@ -234,10 +240,13 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="label">Harmonogram (cron)</label>
-            <input value={form.backup_cron} onChange={e => set('backup_cron', e.target.value)} className="input font-mono" placeholder="0 3 * * *" />
+            <input value={form.backup_cron} onChange={e => set('backup_cron', e.target.value)} className="input font-mono" placeholder="0 4 * * *" />
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            <button type="button" onClick={() => createDbBkMutation.mutate()} disabled={createDbBkMutation.isPending} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl text-sm">
+              <Download size={15} /> Utwórz backup .db
+            </button>
             <button type="button" onClick={backupApi.export} className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
               <Download size={15} /> Eksportuj dane (JSON)
             </button>

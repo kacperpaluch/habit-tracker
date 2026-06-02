@@ -24,6 +24,7 @@ export const backupApi = {
   },
   restoreFromServer: (filename: string) => api.post(`/backup/restore/${encodeURIComponent(filename)}`),
   delete: (filename: string) => api.delete(`/backup/${filename}`),
+  createDbBackup: () => api.post<{ filename: string }>('/backup/create-db').then(r => r.data),
 }
 
 export const authApi = {
