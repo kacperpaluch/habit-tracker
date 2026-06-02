@@ -23,6 +23,46 @@ Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Dział
 
 ## Szybki start
 
+### Gotowy obraz z Docker Hub (zalecane)
+
+Obraz dostępny na [hub.docker.com/r/kpa90/habit-tracker](https://hub.docker.com/r/kpa90/habit-tracker).
+
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v habit-data:/data \
+  -v habit-backups:/backups \
+  -e ADMIN_PASSWORD=moje-haslo \
+  -e SECRET_KEY=$(openssl rand -hex 32) \
+  -e TZ=Europe/Warsaw \
+  kpa90/habit-tracker:latest
+```
+
+Lub przez Docker Compose:
+
+```yaml
+services:
+  habit-tracker:
+    image: kpa90/habit-tracker:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - habit-data:/data
+      - habit-backups:/backups
+    environment:
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=zmień-mnie
+      - SECRET_KEY=zmień-na-losowy-string
+      - TZ=Europe/Warsaw
+    restart: unless-stopped
+
+volumes:
+  habit-data:
+  habit-backups:
+```
+
+### Budowanie ze źródeł
+
 ```bash
 # Sklonuj repozytorium
 git clone https://codeberg.org/kacperpaluch/habit-tracker
