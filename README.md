@@ -207,10 +207,11 @@ Frontend deweloperski dostępny pod http://localhost:5173
 - Konfigurowany przez cron expression w Ustawieniach (zmiana działa od razu, bez restartu kontenera)
 
 **Z poziomu interfejsu** (Ustawienia → sekcja Backup):
+- **Utwórz backup .db** — natychmiastowe wykonanie kopii bazy SQLite
 - **Eksportuj dane (JSON)** — pobierz pełny eksport danych
 - **Importuj JSON** — przywróć dane z pliku JSON (nadpisuje wszystko)
 - **Wczytaj plik .db z dysku** — upload pliku `.db` i natychmiastowe przywrócenie
-- **Lista backupów** — pliki `.db` (automatyczne) i `.json` (eksporty); każdy można pobrać (⬇), pliki `.db` można też przywrócić (🔼) bezpośrednio z listy
+- **Lista backupów** — pliki `.db` (automatyczne i ręczne) i `.json` (eksporty); każdy można pobrać (⬇), pliki `.db` można też przywrócić (🔼) bezpośrednio z listy
 
 **Odtworzenie po awarii (bez dostępu do UI):**
 ```bash
