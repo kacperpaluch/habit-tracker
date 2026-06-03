@@ -93,7 +93,6 @@ export default function TodayPage() {
     },
   })
 
-  // Group by category
   const groupedByCategory = useMemo(() => {
     const byId: Record<number, Habit[]> = {}
     const uncategorized: Habit[] = []
@@ -112,7 +111,7 @@ export default function TodayPage() {
       }
     })
     if (uncategorized.length) {
-      result.push({ id: null, name: 'Bez kategorii', color: '#9ca3af', habits: uncategorized })
+      result.push({ id: null, name: 'Bez kategorii', color: '#b8a898', habits: uncategorized })
     }
     return result
   }, [habits, categories])
@@ -121,79 +120,84 @@ export default function TodayPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-      {/* Date nav */}
+      {/* Date navigation */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setSelectedDate(d => subDays(d, 1))}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+            className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 transition-all"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
-          <div className="text-center">
-            <div className="font-semibold text-gray-900 dark:text-gray-100 capitalize">
+          <div className="text-center min-w-[120px]">
+            <div className="font-semibold text-stone-900 dark:text-stone-100 capitalize text-sm">
               {isCurrentDay ? 'Dzisiaj' : format(selectedDate, 'EEEE', { locale: pl })}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
               {format(selectedDate, 'd MMMM yyyy', { locale: pl })}
             </div>
           </div>
           <button
             onClick={() => setSelectedDate(d => addDays(d, 1))}
             disabled={isCurrentDay}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 disabled:opacity-30"
+            className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 disabled:opacity-20 transition-all"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
           {!isCurrentDay && (
             <button
               onClick={() => setSelectedDate(new Date())}
-              className="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg"
+              className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
             >
-              Dzisiaj
+              Dziś
             </button>
           )}
         </div>
 
         <button
           onClick={() => { setEditingHabit(undefined); setShowForm(true) }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full text-sm font-medium transition-all shadow-sm shadow-primary-600/20"
         >
-          <Plus size={16} />
+          <Plus size={15} strokeWidth={2.5} />
           <span className="hidden sm:inline">Nowy nawyk</span>
         </button>
       </div>
 
       {/* Progress block */}
       {isCurrentDay && summary && summary.total > 0 && (
-        <div className={`rounded-xl p-5 border transition-colors ${
+        <div className={`rounded-2xl p-5 border transition-all ${
           allDone
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'
+            ? 'bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-900/40'
+            : 'bg-white dark:bg-warm-900 border-warm-200 dark:border-warm-800'
         }`}>
           <div className="flex items-end justify-between mb-4">
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Postęp dnia</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 leading-none">
+              <p className="text-xs font-medium text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2">
+                Postęp dnia
+              </p>
+              <p className="font-serif text-5xl text-stone-900 dark:text-stone-100 leading-none">
                 {summary.done}
-                <span className="text-lg font-normal text-gray-400 ml-1">z {summary.total}</span>
+                <span className="text-2xl text-stone-300 dark:text-stone-600 ml-2 font-sans font-normal">
+                  / {summary.total}
+                </span>
               </p>
               {allDone && (
-                <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1 flex items-center gap-1">
+                <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-2 flex items-center gap-1.5">
                   <PartyPopper size={14} /> Wszystkie nawyki ukończone!
                 </p>
               )}
             </div>
             <div className="text-right">
-              <p className={`text-3xl font-bold leading-none ${
+              <p className={`font-serif text-5xl leading-none ${
                 allDone ? 'text-green-600 dark:text-green-400' : 'text-primary-600 dark:text-primary-400'
               }`}>
-                {summary.rate}%
+                {summary.rate}
+                <span className="font-sans text-2xl font-normal">%</span>
               </p>
-              <p className="text-xs text-gray-400 mt-1">ukończono</p>
+              <p className="text-xs text-stone-400 mt-1">ukończono</p>
             </div>
           </div>
-          <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-2 bg-warm-100 dark:bg-warm-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${
                 allDone
@@ -206,15 +210,15 @@ export default function TodayPage() {
         </div>
       )}
 
-      {/* Habits */}
+      {/* Habits list */}
       {habits.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <Calendar className="mx-auto mb-3 opacity-30" size={48} />
-          <p className="font-medium">Brak nawyków</p>
-          <p className="text-sm mt-1">Dodaj swój pierwszy nawyk!</p>
+        <div className="text-center py-20 text-stone-400">
+          <Calendar className="mx-auto mb-4 opacity-20" size={52} />
+          <p className="font-serif text-xl text-stone-300 dark:text-stone-600">Brak nawyków</p>
+          <p className="text-sm mt-1.5 text-stone-400 dark:text-stone-500">Dodaj swój pierwszy nawyk!</p>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {groupedByCategory.map(({ id, name, color, habits: groupHabits }) => {
             const done = groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
             const total = groupHabits.length
@@ -225,15 +229,15 @@ export default function TodayPage() {
                 {groupedByCategory.length > 1 && (
                   <div className="flex items-center gap-2 mb-3">
                     <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: color }}
                     />
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <h3 className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                       {name}
                     </h3>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700 ml-1" />
+                    <div className="flex-1 h-px bg-warm-200 dark:bg-warm-800 ml-1" />
                     <span className={`text-xs font-semibold tabular-nums ${
-                      sectionDone ? 'text-green-600 dark:text-green-400' : 'text-gray-400'
+                      sectionDone ? 'text-green-600 dark:text-green-400' : 'text-stone-400 dark:text-stone-500'
                     }`}>
                       {done}/{total}
                     </span>

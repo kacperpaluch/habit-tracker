@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Activity } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface LoginPageProps {
@@ -24,44 +23,56 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-warm-50 dark:bg-warm-950 px-4">
+      {/* Subtle background texture */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary-50/60 via-transparent to-transparent dark:from-primary-900/20 dark:via-transparent pointer-events-none" />
+
+      <div className="w-full max-w-sm relative">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-100 dark:bg-primary-900/30 mb-4">
-            <Activity className="text-primary-600 dark:text-primary-400" size={32} />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Habit Tracker</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Zaloguj się do swojej instancji</p>
+          <h1 className="font-serif text-4xl text-stone-900 dark:text-stone-100 mb-1">
+            Nawyki
+          </h1>
+          <p className="text-sm text-stone-400 dark:text-stone-500">
+            Zaloguj się, by kontynuować
+          </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Card */}
+        <div className="bg-white dark:bg-warm-900 rounded-3xl shadow-xl shadow-warm-300/20 dark:shadow-warm-950/60 border border-warm-200 dark:border-warm-800 p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Użytkownik</label>
+              <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">
+                Użytkownik
+              </label>
               <input
                 required
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-warm-200 dark:border-warm-800 rounded-2xl bg-warm-50 dark:bg-warm-850 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-400 focus:border-transparent transition placeholder:text-stone-300 dark:placeholder:text-stone-600"
                 autoComplete="username"
+                placeholder="admin"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hasło</label>
+              <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">
+                Hasło
+              </label>
               <input
                 required
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-warm-200 dark:border-warm-800 rounded-2xl bg-warm-50 dark:bg-warm-850 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-400 focus:border-transparent transition placeholder:text-stone-300 dark:placeholder:text-stone-600"
                 autoComplete="current-password"
+                placeholder="••••••••"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors mt-2"
+              className="w-full py-3 bg-primary-600 hover:bg-primary-700 active:scale-[0.98] disabled:opacity-60 text-white font-semibold rounded-2xl transition-all mt-2 shadow-sm shadow-primary-600/30"
             >
               {loading ? 'Logowanie…' : 'Zaloguj się'}
             </button>

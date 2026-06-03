@@ -21,15 +21,23 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
   const [expanded, setExpanded] = useState(false)
   const [qty, setQty] = useState('')
   const [noteText, setNoteText] = useState<string | null>(null)
+  const [justChecked, setJustChecked] = useState(false)
 
-  // value > 0 = actually done; value = 0 = note-only entry
   const done = !!entry && entry.value > 0
-  const color = habit.category?.color ?? '#6366f1'
+  const color = habit.category?.color ?? '#d97706'
   const currentNote = entry?.note ?? ''
 
   useEffect(() => {
     setNoteText(null)
   }, [entry?.id, entry?.note])
+
+  useEffect(() => {
+    if (done) {
+      setJustChecked(true)
+      const t = setTimeout(() => setJustChecked(false), 500)
+      return () => clearTimeout(t)
+    }
+  }, [done])
 
   const noteMutation = useMutation({
     mutationFn: (text: string) => {
@@ -72,13 +80,13 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
   return (
     <div
       className={clsx(
-        'rounded-xl border bg-white dark:bg-gray-850 dark:border-gray-700 transition-all',
+        'rounded-2xl border transition-all duration-200 animate-card-in',
         done
-          ? 'border-green-200 dark:border-green-900/50 bg-green-50/40 dark:bg-green-900/10'
-          : 'border-gray-200',
-        habit.is_paused && 'opacity-60'
+          ? 'bg-green-50/60 dark:bg-green-900/10 border-green-200 dark:border-green-900/40'
+          : 'bg-white dark:bg-warm-900 border-warm-200 dark:border-warm-800',
+        habit.is_paused && 'opacity-55'
       )}
-      style={{ borderLeftColor: color, borderLeftWidth: 4 }}
+      style={{ borderLeftColor: color, borderLeftWidth: 3 }}
     >
       <div className="flex items-center gap-3 p-4">
         {/* Check button */}
@@ -88,43 +96,45 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
           className={clsx(
             'flex-shrink-0 w-11 h-11 rounded-full border-2 flex items-center justify-center transition-all touch-manipulation',
             done
-              ? 'bg-green-500 border-green-500 text-white shadow-sm'
-              : 'border-gray-300 dark:border-gray-600 text-gray-300 hover:border-primary-400 hover:text-primary-400'
+              ? 'bg-green-500 border-green-500 text-white shadow-md shadow-green-200 dark:shadow-green-900/40'
+              : 'border-warm-300 dark:border-warm-700 text-warm-300 dark:text-warm-700 hover:border-primary-400 hover:text-primary-500 hover:shadow-sm',
+            justChecked && 'animate-check-pop'
           )}
         >
-          {done ? <Check size={20} strokeWidth={2.5} /> : (
-            habit.mode === 'quantitative' ? <Plus size={18} /> : <Check size={18} />
-          )}
+          {done
+            ? <Check size={20} strokeWidth={2.5} />
+            : habit.mode === 'quantitative' ? <Plus size={18} /> : <Check size={18} />
+          }
         </button>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={clsx(
-              'font-medium text-gray-900 dark:text-gray-100 truncate',
-              done && 'line-through text-gray-400 dark:text-gray-500'
+              'font-medium text-stone-900 dark:text-stone-100 truncate',
+              done && 'line-through text-stone-400 dark:text-stone-500'
             )}>
               {habit.name}
             </span>
-            {habit.is_paused && <Pause size={14} className="text-amber-500 flex-shrink-0" />}
+            {habit.is_paused && <Pause size={13} className="text-amber-500 flex-shrink-0" />}
             {currentNote && (
               <span title={currentNote}>
-                <FileText size={13} className="text-gray-400 flex-shrink-0" />
+                <FileText size={12} className="text-stone-400 flex-shrink-0" />
               </span>
             )}
           </div>
           {habit.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{habit.description}</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 truncate mt-0.5">{habit.description}</p>
           )}
           {habit.mode === 'quantitative' && entry && entry.value > 0 && (
-            <div className="mt-1.5">
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
                 <span>{entry.value} / {habit.goal_value} {habit.goal_unit}</span>
-                <span>{goalProgress?.toFixed(0)}%</span>
+                <span className="font-medium">{goalProgress?.toFixed(0)}%</span>
               </div>
-              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-warm-100 dark:bg-warm-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary-500 rounded-full transition-all"
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-500"
                   style={{ width: `${goalProgress}%` }}
                 />
               </div>
@@ -133,16 +143,16 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
         </div>
 
         {/* Streak + expand */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {streak > 0 && (
-            <span className="flex items-center gap-0.5 text-sm font-bold text-orange-500">
-              <Flame size={15} />
-              {streak}
+            <span className="flex items-center gap-0.5">
+              <Flame size={14} className="text-orange-500" />
+              <span className="font-serif text-base font-normal text-orange-500 leading-none">{streak}</span>
             </span>
           )}
           <button
             onClick={() => setExpanded(e => !e)}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-1.5 text-stone-300 dark:text-stone-600 hover:text-stone-500 dark:hover:text-stone-400 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 transition-all"
           >
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -151,7 +161,7 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
 
       {/* Expanded section */}
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+        <div className="px-4 pb-4 space-y-3 border-t border-warm-100 dark:border-warm-800 pt-3 animate-fade-in-up">
           {/* Quantitative input */}
           {habit.mode === 'quantitative' && (
             <div className="flex items-center gap-2">
@@ -160,34 +170,34 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
                 value={qty}
                 onChange={e => setQty(e.target.value)}
                 placeholder={`Dodaj ${habit.goal_unit || 'wartość'}`}
-                className="w-32 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                className="w-36 px-3 py-1.5 text-sm border border-warm-200 dark:border-warm-800 rounded-xl bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-400 focus:outline-none"
               />
               <button
                 onClick={handleAddQty}
-                className="px-3 py-1 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium transition-colors"
               >
                 Dodaj
               </button>
             </div>
           )}
 
-          {/* Note field — always visible */}
+          {/* Note field */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              Notatka {!done && <span className="text-gray-400">(nawyk niewykonany)</span>}
+            <label className="text-xs font-medium text-stone-400 dark:text-stone-500">
+              Notatka {!done && <span className="text-stone-300 dark:text-stone-600">(nawyk niewykonany)</span>}
             </label>
             <textarea
               rows={2}
               value={displayNote}
               onChange={e => setNoteText(e.target.value)}
               placeholder={done ? 'Dodaj notatkę do dzisiejszego wpisu…' : 'Dlaczego pominąłem? Co mi przeszkodziło?'}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none focus:ring-1 focus:ring-primary-400 focus:outline-none"
+              className="w-full px-3 py-2 text-sm border border-warm-200 dark:border-warm-800 rounded-xl bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 resize-none focus:ring-2 focus:ring-primary-400 focus:outline-none placeholder:text-stone-300 dark:placeholder:text-stone-600"
             />
             {noteDirty && (
               <button
                 onClick={() => noteMutation.mutate(noteText!)}
                 disabled={noteMutation.isPending}
-                className="px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
+                className="px-4 py-1.5 text-xs bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium disabled:opacity-60 transition-colors"
               >
                 {noteMutation.isPending ? 'Zapisywanie…' : 'Zapisz notatkę'}
               </button>
@@ -195,18 +205,18 @@ export default function HabitCard({ habit, entry, date, onToggle, onUncheck, onE
           </div>
 
           {/* Edit / Delete */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pt-0.5">
             <button
               onClick={() => onEdit(habit)}
-              className="flex items-center gap-1.5 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-primary-600 dark:hover:text-primary-400 border border-warm-200 dark:border-warm-800 rounded-xl hover:border-primary-300 dark:hover:border-primary-700 transition-all"
             >
-              <Edit2 size={13} /> Edytuj
+              <Edit2 size={12} /> Edytuj
             </button>
             <button
               onClick={() => onDelete(habit)}
-              className="flex items-center gap-1.5 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-red-300"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-red-600 dark:hover:text-red-400 border border-warm-200 dark:border-warm-800 rounded-xl hover:border-red-300 dark:hover:border-red-800 transition-all"
             >
-              <Trash2 size={13} /> Usuń
+              <Trash2 size={12} /> Usuń
             </button>
           </div>
         </div>
