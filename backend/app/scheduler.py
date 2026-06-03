@@ -27,12 +27,14 @@ async def run_daily_summary():
     try:
         settings = db.query(Settings).first()
         if not settings or not settings.daily_summary_enabled:
+            logger.info("Daily summary skipped: disabled in settings")
             return
 
         today = date.today()
         habits = db.query(Habit).filter(Habit.is_active == True).all()
-        entries_today = {
-            e.habit_id for e in db.query(Entry).filter(Entry.date == today).all()
+        # Only count entries with value > 0 as "done"; value=0 (noted skip) should still trigger a reminder
+        entries_done_today = {
+            e.habit_id for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
         }
 
         pending = []
@@ -40,13 +42,17 @@ async def run_daily_summary():
             if stats_lib.is_paused_on(h, today):
                 continue
             scheduled = stats_lib.get_scheduled_dates(h, today, today)
-            if scheduled and h.id not in entries_today:
+            if scheduled and h.id not in entries_done_today:
                 pending.append({"name": h.name, "time_of_day": h.time_of_day})
 
+        logger.info(f"Daily summary: {len(habits)} active habits, {len(pending)} pending, sending to {settings.notification_email}")
         if pending:
             await send_daily_reminder(settings, pending)
+            logger.info("Daily summary email sent")
+        else:
+            logger.info("Daily summary: no pending habits, email skipped")
     except Exception as e:
-        logger.error(f"Daily summary error: {e}")
+        logger.error(f"Daily summary error: {e}", exc_info=True)
     finally:
         db.close()
 
