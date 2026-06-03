@@ -61,3 +61,13 @@ async def send_daily_reminder(settings: Settings, habits: list):
     </table>
     """
     await send_email(settings, subject="Habit Tracker — Daily Reminder", body_html=body)
+
+
+async def send_habit_reminder(settings: Settings, habit_name: str):
+    body = f"""
+    <h2 style="font-family:sans-serif">Habit Tracker — Reminder</h2>
+    <p style="font-family:sans-serif">
+      Time to work on: <strong>{habit_name}</strong>
+    </p>
+    """
+    await send_email(settings, subject=f"Habit Tracker — {habit_name}", body_html=body)

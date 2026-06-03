@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import Settings, Habit, Entry
 from . import stats as stats_lib
-from .email import send_daily_reminder
+from .email import send_daily_reminder, send_habit_reminder
 
 logger = logging.getLogger(__name__)
 BACKUP_DIR = os.getenv("BACKUP_DIR", "/backups")
@@ -53,6 +53,42 @@ async def run_daily_summary():
             logger.info("Daily summary: no pending habits, email skipped")
     except Exception as e:
         logger.error(f"Daily summary error: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+async def run_habit_reminders():
+    """Fires every minute; sends a per-habit email when reminder_time matches now and habit not yet done."""
+    db = _get_db()
+    try:
+        settings = db.query(Settings).first()
+        if not settings or not settings.smtp_host or not settings.notification_email:
+            return
+
+        now_str = datetime.now().strftime("%H:%M")
+        today = date.today()
+
+        habits = (
+            db.query(Habit)
+            .filter(Habit.is_active == True, Habit.reminder_time == now_str)
+            .all()
+        )
+        if not habits:
+            return
+
+        entries_done_today = {
+            e.habit_id for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
+        }
+
+        for h in habits:
+            if stats_lib.is_paused_on(h, today):
+                continue
+            scheduled = stats_lib.get_scheduled_dates(h, today, today)
+            if scheduled and h.id not in entries_done_today:
+                logger.info(f"Sending reminder for habit '{h.name}' ({now_str})")
+                await send_habit_reminder(settings, h.name)
+    except Exception as e:
+        logger.error(f"Habit reminder error: {e}", exc_info=True)
     finally:
         db.close()
 
@@ -125,6 +161,13 @@ def setup_scheduler(app=None):
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        run_habit_reminders,
+        CronTrigger(minute="*", timezone=tz),
+        id="habit_reminders",
+        replace_existing=True,
+    )
+
     if not scheduler.running:
         scheduler.start()
 
@@ -146,5 +189,12 @@ def reschedule(settings: Settings):
             month=parts[3], day_of_week=parts[4], timezone=tz,
         ),
         id="auto_backup",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_habit_reminders,
+        CronTrigger(minute="*", timezone=tz),
+        id="habit_reminders",
         replace_existing=True,
     )
