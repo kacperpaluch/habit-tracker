@@ -8,7 +8,6 @@ from datetime import date, datetime
 class CategoryBase(BaseModel):
     name: str
     color: str = "#6366f1"
-    icon: str = "tag"
 
 class CategoryCreate(CategoryBase):
     pass
@@ -16,7 +15,6 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
-    icon: Optional[str] = None
 
 class CategoryOut(CategoryBase):
     id: int
@@ -37,7 +35,6 @@ class HabitBase(BaseModel):
     category_id: Optional[int] = None
     schedule_type: str = "daily"
     schedule_params: dict = {}
-    time_of_day: Optional[str] = None
     reminder_time: Optional[str] = None
     order: int = 0
 
@@ -53,7 +50,6 @@ class HabitUpdate(BaseModel):
     category_id: Optional[int] = None
     schedule_type: Optional[str] = None
     schedule_params: Optional[dict] = None
-    time_of_day: Optional[str] = None
     reminder_time: Optional[str] = None
     is_active: Optional[bool] = None
     is_paused: Optional[bool] = None

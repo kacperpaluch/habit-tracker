@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { settingsApi, backupApi } from '../api/settings'
 import { categoriesApi } from '../api/categories'
 import type { Category } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const TIMEZONES = [
   'UTC', 'Europe/Warsaw', 'Europe/London', 'Europe/Berlin', 'America/New_York',
@@ -24,8 +25,11 @@ export default function SettingsPage() {
     daily_summary_time: '08:00', daily_summary_enabled: false,
     timezone: 'UTC', current_password: '', new_password: '', new_password2: '',
   })
-  const [catForm, setCatForm] = useState({ name: '', color: '#6366f1', icon: 'tag' })
+  const [catForm, setCatForm] = useState({ name: '', color: '#6366f1' })
   const [editingCat, setEditingCat] = useState<Category | null>(null)
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null)
+  const [confirmDeleteBk, setConfirmDeleteBk] = useState<string | null>(null)
+  const [confirmRestoreBk, setConfirmRestoreBk] = useState<string | null>(null)
 
   useEffect(() => {
     if (settings) {
@@ -55,12 +59,12 @@ export default function SettingsPage() {
 
   const deleteBkMutation = useMutation({
     mutationFn: backupApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['backups'] }); setConfirmDeleteBk(null) },
   })
 
   const restoreServerMutation = useMutation({
     mutationFn: backupApi.restoreFromServer,
-    onSuccess: () => { qc.invalidateQueries(); toast.success('Backup przywrócony! Odśwież stronę.') },
+    onSuccess: () => { qc.invalidateQueries(); toast.success('Backup przywrócony! Odśwież stronę.'); setConfirmRestoreBk(null) },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Błąd przywracania'),
   })
 
@@ -77,7 +81,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['categories'] })
       qc.invalidateQueries({ queryKey: ['habits'] })
-      setCatForm({ name: '', color: '#6366f1', icon: 'tag' })
+      setCatForm({ name: '', color: '#6366f1' })
       setEditingCat(null)
       toast.success(editingCat ? 'Kategoria zaktualizowana' : 'Kategoria dodana')
     },
@@ -85,7 +89,11 @@ export default function SettingsPage() {
 
   const deleteCatMutation = useMutation({
     mutationFn: categoriesApi.delete,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categories'] }); qc.invalidateQueries({ queryKey: ['habits'] }) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      setConfirmDeleteCat(null)
+    },
   })
 
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
@@ -125,12 +133,12 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ustawienia</h1>
+      <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Ustawienia</h1>
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* SMTP */}
-        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Powiadomienia e-mail (SMTP)</h2>
+        <section className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 p-6 space-y-4">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">Powiadomienia e-mail (SMTP)</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -168,11 +176,11 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.smtp_tls} onChange={e => set('smtp_tls', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Użyj TLS/SSL</span>
+              <span className="text-sm text-stone-700 dark:text-stone-300">Użyj TLS/SSL</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.daily_summary_enabled} onChange={e => set('daily_summary_enabled', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Dzienne podsumowanie</span>
+              <span className="text-sm text-stone-700 dark:text-stone-300">Dzienne podsumowanie</span>
             </label>
           </div>
 
@@ -186,7 +194,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => testEmailMutation.mutate()}
                 disabled={testEmailMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                className="flex items-center gap-2 px-4 py-2.5 border border-warm-200 dark:border-warm-800 rounded-xl text-sm hover:bg-warm-50 dark:hover:bg-warm-800 text-stone-700 dark:text-stone-300"
               >
                 <TestTube size={15} />
                 Wyślij testowy e-mail
@@ -196,8 +204,8 @@ export default function SettingsPage() {
         </section>
 
         {/* General */}
-        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Ogólne</h2>
+        <section className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 p-6 space-y-4">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">Ogólne</h2>
           <div>
             <label className="label">Strefa czasowa</label>
             <select value={form.timezone} onChange={e => set('timezone', e.target.value)} className="input">
@@ -207,8 +215,8 @@ export default function SettingsPage() {
         </section>
 
         {/* Password */}
-        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Zmiana hasła</h2>
+        <section className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 p-6 space-y-4">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">Zmiana hasła</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="label">Aktualne hasło</label>
@@ -226,12 +234,12 @@ export default function SettingsPage() {
         </section>
 
         {/* Backup */}
-        <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Backup</h2>
+        <section className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 p-6 space-y-4">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">Backup</h2>
           <div className="grid grid-cols-2 gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.backup_enabled} onChange={e => set('backup_enabled', e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Automatyczny backup</span>
+              <span className="text-sm text-stone-700 dark:text-stone-300">Automatyczny backup</span>
             </label>
             <div>
               <label className="label">Zachowaj ostatnich N backupów</label>
@@ -247,14 +255,14 @@ export default function SettingsPage() {
             <button type="button" onClick={() => createDbBkMutation.mutate()} disabled={createDbBkMutation.isPending} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl text-sm">
               <Download size={15} /> Utwórz backup .db
             </button>
-            <button type="button" onClick={backupApi.export} className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">
+            <button type="button" onClick={backupApi.export} className="flex items-center gap-2 px-4 py-2 border border-warm-200 dark:border-warm-800 rounded-xl text-sm hover:bg-warm-50 dark:hover:bg-warm-800 text-stone-700 dark:text-stone-300">
               <Download size={15} /> Eksportuj dane (JSON)
             </button>
-            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label className="flex items-center gap-2 px-4 py-2 border border-warm-200 dark:border-warm-800 rounded-xl text-sm hover:bg-warm-50 dark:hover:bg-warm-800 text-stone-700 dark:text-stone-300 cursor-pointer">
               <Upload size={15} /> Importuj JSON
               <input type="file" accept=".json" className="hidden" onChange={handleImport} />
             </label>
-            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label className="flex items-center gap-2 px-4 py-2 border border-warm-200 dark:border-warm-800 rounded-xl text-sm hover:bg-warm-50 dark:hover:bg-warm-800 text-stone-700 dark:text-stone-300 cursor-pointer">
               <Upload size={15} /> Wczytaj plik .db z dysku
               <input type="file" accept=".db" className="hidden" onChange={handleRestoreDb} />
             </label>
@@ -262,18 +270,18 @@ export default function SettingsPage() {
 
           {backups.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zapisane backupy</p>
+              <p className="text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">Zapisane backupy</p>
               <div className="space-y-1 max-h-56 overflow-y-auto">
                 {backups.map(b => (
-                  <div key={b.filename} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs">
-                    <span className="text-gray-700 dark:text-gray-300 font-mono truncate">{b.filename}</span>
+                  <div key={b.filename} className="flex items-center justify-between px-3 py-2 bg-warm-50 dark:bg-warm-800 rounded-lg text-xs">
+                    <span className="text-stone-700 dark:text-stone-300 font-mono truncate">{b.filename}</span>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                      <span className="text-gray-400">{(b.size / 1024).toFixed(1)} KB</span>
+                      <span className="text-stone-400 dark:text-stone-500">{(b.size / 1024).toFixed(1)} KB</span>
                       <button
                         type="button"
                         title="Pobierz"
                         onClick={() => backupApi.download(b.filename)}
-                        className="text-blue-400 hover:text-blue-600"
+                        className="text-primary-500 hover:text-primary-600"
                       >
                         <Download size={12} />
                       </button>
@@ -281,11 +289,8 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           title="Przywróć"
-                          onClick={() => {
-                            if (confirm('Przywrócić backup „' + b.filename + '"?\nBieżące dane zostaną nadpisane.'))
-                              restoreServerMutation.mutate(b.filename)
-                          }}
-                          className="text-amber-400 hover:text-amber-600"
+                          onClick={() => setConfirmRestoreBk(b.filename)}
+                          className="text-amber-500 hover:text-amber-600"
                           disabled={restoreServerMutation.isPending}
                         >
                           <Upload size={12} />
@@ -294,7 +299,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         title="Usuń"
-                        onClick={() => deleteBkMutation.mutate(b.filename)}
+                        onClick={() => setConfirmDeleteBk(b.filename)}
                         className="text-red-400 hover:text-red-600"
                       >
                         <Trash2 size={12} />
@@ -320,26 +325,26 @@ export default function SettingsPage() {
       </form>
 
       {/* Categories */}
-      <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Kategorie</h2>
+      <section className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 p-6 space-y-4">
+        <h2 className="font-semibold text-stone-900 dark:text-stone-100">Kategorie</h2>
 
         <div className="space-y-2">
           {categories.map(c => (
-            <div key={c.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div key={c.id} className="flex items-center justify-between px-3 py-2 bg-warm-50 dark:bg-warm-800 rounded-lg">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: c.color }} />
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{c.name}</span>
+                <span className="text-sm font-medium text-stone-900 dark:text-stone-100">{c.name}</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => { setEditingCat(c); setCatForm({ name: c.name, color: c.color, icon: c.icon }) }}
-                  className="p-1.5 text-gray-400 hover:text-primary-600 rounded"
+                  onClick={() => { setEditingCat(c); setCatForm({ name: c.name, color: c.color }) }}
+                  className="p-1.5 text-stone-400 hover:text-primary-600 rounded"
                 >
                   <Edit2 size={14} />
                 </button>
                 <button
-                  onClick={() => { if (confirm(`Usunąć kategorię "${c.name}"?`)) deleteCatMutation.mutate(c.id) }}
-                  className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                  onClick={() => setConfirmDeleteCat(c)}
+                  className="p-1.5 text-stone-400 hover:text-red-600 rounded"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -348,7 +353,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        <div className="flex items-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-end gap-3 pt-2 border-t border-warm-200 dark:border-warm-800">
           <div className="flex-1">
             <label className="label">Nazwa</label>
             <input
@@ -364,15 +369,15 @@ export default function SettingsPage() {
               type="color"
               value={catForm.color}
               onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))}
-              className="h-10 w-14 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+              className="h-10 w-14 rounded-lg border border-warm-200 dark:border-warm-800 cursor-pointer"
             />
           </div>
           <div className="flex gap-2">
             {editingCat && (
               <button
                 type="button"
-                onClick={() => { setEditingCat(null); setCatForm({ name: '', color: '#6366f1', icon: 'tag' }) }}
-                className="px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                onClick={() => { setEditingCat(null); setCatForm({ name: '', color: '#6366f1' }) }}
+                className="px-3 py-2.5 border border-warm-200 dark:border-warm-800 rounded-xl text-stone-500 hover:bg-warm-50 dark:hover:bg-warm-800"
               >
                 <X size={16} />
               </button>
@@ -389,6 +394,36 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={confirmDeleteCat !== null}
+        title="Usuń kategorię"
+        message={`Czy na pewno chcesz usunąć kategorię "${confirmDeleteCat?.name}"? Nawyki z tej kategorii nie zostaną usunięte — stracą tylko przypisanie.`}
+        confirmLabel="Usuń"
+        danger
+        onConfirm={() => confirmDeleteCat && deleteCatMutation.mutate(confirmDeleteCat.id)}
+        onCancel={() => setConfirmDeleteCat(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteBk !== null}
+        title="Usuń backup"
+        message={`Czy na pewno chcesz usunąć plik "${confirmDeleteBk}"? Tej operacji nie można cofnąć.`}
+        confirmLabel="Usuń"
+        danger
+        onConfirm={() => confirmDeleteBk && deleteBkMutation.mutate(confirmDeleteBk)}
+        onCancel={() => setConfirmDeleteBk(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRestoreBk !== null}
+        title="Przywróć backup"
+        message={`Czy na pewno chcesz przywrócić backup "${confirmRestoreBk}"? Wszystkie bieżące dane zostaną nadpisane.`}
+        confirmLabel="Przywróć"
+        danger
+        onConfirm={() => confirmRestoreBk && restoreServerMutation.mutate(confirmRestoreBk)}
+        onCancel={() => setConfirmRestoreBk(null)}
+      />
     </div>
   )
 }

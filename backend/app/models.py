@@ -10,7 +10,6 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     color = Column(String, default="#6366f1")
-    icon = Column(String, default="tag")
     created_at = Column(DateTime, server_default=func.now())
 
     habits = relationship("Habit", back_populates="category")
@@ -31,7 +30,6 @@ class Habit(Base):
     schedule_type = Column(String, default="daily")
     schedule_params = Column(JSON, default=dict)  # {"times": 3} or {"days": [0,2,4]}
 
-    time_of_day = Column(String, nullable=True)  # morning | afternoon | evening
     reminder_time = Column(String, nullable=True)  # HH:MM
 
     is_active = Column(Boolean, default=True)

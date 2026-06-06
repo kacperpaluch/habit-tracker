@@ -1,34 +1,51 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper } from 'lucide-react'
-import { format, addDays, subDays, isToday } from 'date-fns'
+import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper, GripVertical, ChevronUp, ChevronDown, Check } from 'lucide-react'
+import { format, addDays, subDays, isToday, isAfter, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { habitsApi, entriesApi, statsApi } from '../api/habits'
 import { categoriesApi } from '../api/categories'
 import HabitCard from '../components/HabitCard'
 import HabitForm from '../components/HabitForm'
+import DatePicker from '../components/DatePicker'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { Habit, Entry } from '../types'
+
+type ViewMode = 'day' | 'week'
 
 export default function TodayPage() {
   const qc = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showForm, setShowForm] = useState(false)
   const [editingHabit, setEditingHabit] = useState<Habit | undefined>()
+  const [viewMode, setViewMode] = useState<ViewMode>('day')
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [editOrder, setEditOrder] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null)
 
-  const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isCurrentDay = isToday(selectedDate)
+
+  const weekDays = useMemo(() => {
+    if (viewMode !== 'week') return []
+    const start = startOfWeek(selectedDate, { weekStartsOn: 1 })
+    const end = endOfWeek(selectedDate, { weekStartsOn: 1 })
+    return eachDayOfInterval({ start, end })
+  }, [viewMode, selectedDate])
+
+  const entriesFrom = viewMode === 'week' ? format(weekDays[0] || selectedDate, 'yyyy-MM-dd') : format(selectedDate, 'yyyy-MM-dd')
+  const entriesTo = viewMode === 'week' ? format(weekDays[6] || selectedDate, 'yyyy-MM-dd') : format(selectedDate, 'yyyy-MM-dd')
 
   const { data: habits = [] } = useQuery({ queryKey: ['habits'], queryFn: habitsApi.list })
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
   const { data: entries = [] } = useQuery({
-    queryKey: ['entries', dateStr],
-    queryFn: () => entriesApi.list({ date_from: dateStr, date_to: dateStr }),
+    queryKey: ['entries', entriesFrom, entriesTo],
+    queryFn: () => entriesApi.list({ date_from: entriesFrom, date_to: entriesTo }),
   })
   const { data: summary } = useQuery({
     queryKey: ['summary'],
     queryFn: statsApi.summary,
-    enabled: isCurrentDay,
+    enabled: isCurrentDay && viewMode === 'day',
   })
   const { data: allStatsData = [] } = useQuery({
     queryKey: ['all-stats'],
@@ -42,13 +59,23 @@ export default function TodayPage() {
     return m
   }, [entries])
 
+  const weekEntryMap = useMemo(() => {
+    if (viewMode !== 'week') return {}
+    const m: Record<number, Record<string, Entry>> = {}
+    entries.forEach(e => {
+      if (!m[e.habit_id]) m[e.habit_id] = {}
+      m[e.habit_id][e.date] = e
+    })
+    return m
+  }, [viewMode, entries])
+
   const streaks = useMemo(
     () => Object.fromEntries(allStatsData.map(s => [s.habit_id, s.current_streak])),
     [allStatsData]
   )
 
   const invalidateStats = () => {
-    qc.invalidateQueries({ queryKey: ['entries', dateStr] })
+    qc.invalidateQueries({ queryKey: ['entries'] })
     qc.invalidateQueries({ queryKey: ['summary'] })
     qc.invalidateQueries({ queryKey: ['all-stats'] })
     qc.invalidateQueries({ queryKey: ['heatmap'] })
@@ -56,13 +83,14 @@ export default function TodayPage() {
   }
 
   const toggleMutation = useMutation({
-    mutationFn: ({ habit, value }: { habit: Habit; value?: number }) =>
-      entriesApi.create({ habit_id: habit.id, date: dateStr, value: value ?? 1 }),
+    mutationFn: ({ habit, date, value }: { habit: Habit; date: string; value?: number }) =>
+      entriesApi.create({ habit_id: habit.id, date, value: value ?? 1 }),
     onSuccess: invalidateStats,
   })
 
   const uncheckMutation = useMutation({
-    mutationFn: (habit: Habit) => entriesApi.deleteByDate(habit.id, dateStr),
+    mutationFn: ({ habit, date }: { habit: Habit; date: string }) =>
+      entriesApi.deleteByDate(habit.id, date),
     onSuccess: invalidateStats,
   })
 
@@ -88,9 +116,15 @@ export default function TodayPage() {
     mutationFn: (id: number) => habitsApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['habits'] })
-      qc.invalidateQueries({ queryKey: ['entries', dateStr] })
+      qc.invalidateQueries({ queryKey: ['entries'] })
+      setConfirmDelete(null)
       toast.success('Nawyk usunięty')
     },
+  })
+
+  const reorderMutation = useMutation({
+    mutationFn: (ids: number[]) => habitsApi.reorder(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['habits'] }),
   })
 
   const groupedByCategory = useMemo(() => {
@@ -116,35 +150,124 @@ export default function TodayPage() {
     return result
   }, [habits, categories])
 
-  const allDone = isCurrentDay && summary && summary.total > 0 && summary.done === summary.total
+  const allDone = isCurrentDay && viewMode === 'day' && summary && summary.total > 0 && summary.done === summary.total
+
+  const moveHabit = (index: number, direction: -1 | 1) => {
+    const newHabits = [...habits]
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= newHabits.length) return
+    ;[newHabits[index], newHabits[targetIndex]] = [newHabits[targetIndex], newHabits[index]]
+    reorderMutation.mutate(newHabits.map(h => h.id))
+  }
+
+  const prevWeek = () => setSelectedDate(d => subDays(d, 7))
+  const nextWeek = () => {
+    const next = addDays(selectedDate, 7)
+    if (!isAfter(addDays(new Date(), 1), next)) return
+    setSelectedDate(next)
+  }
+  const isInThisWeek = weekDays.some(d => isToday(d))
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      {/* View toggle & navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setViewMode('day')}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              viewMode === 'day'
+                ? 'bg-primary-600 text-white'
+                : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
+            }`}
+          >
+            Dzień
+          </button>
+          <button
+            onClick={() => setViewMode('week')}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              viewMode === 'week'
+                ? 'bg-primary-600 text-white'
+                : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
+            }`}
+          >
+            Tydzień
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          {!editOrder && (
+            <button
+              onClick={() => setEditOrder(true)}
+              title="Zmień kolejność nawyków"
+              className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-400 dark:text-stone-500 transition-all"
+            >
+              <GripVertical size={16} />
+            </button>
+          )}
+          {editOrder && (
+            <button
+              onClick={() => setEditOrder(false)}
+              className="px-3 py-1 text-xs font-medium bg-primary-600 text-white rounded-full transition-all"
+            >
+              Gotowe
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Date navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setSelectedDate(d => subDays(d, 1))}
+            onClick={() => viewMode === 'day' ? setSelectedDate(d => subDays(d, 1)) : prevWeek()}
             className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 transition-all"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="text-center min-w-[120px]">
-            <div className="font-semibold text-stone-900 dark:text-stone-100 capitalize text-sm">
-              {isCurrentDay ? 'Dzisiaj' : format(selectedDate, 'EEEE', { locale: pl })}
-            </div>
-            <div className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-              {format(selectedDate, 'd MMMM yyyy', { locale: pl })}
-            </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowDatePicker(v => !v)}
+              className="text-center min-w-[120px] cursor-pointer hover:bg-warm-100 dark:hover:bg-warm-850 rounded-xl py-1 px-2 transition-all"
+            >
+              <div className="font-semibold text-stone-900 dark:text-stone-100 capitalize text-sm">
+                {viewMode === 'day'
+                  ? (isCurrentDay ? 'Dzisiaj' : format(selectedDate, 'EEEE', { locale: pl }))
+                  : (isInThisWeek ? 'Ten tydzień' : `Tydzień ${format(weekDays[0], 'd MMM', { locale: pl })}`)
+                }
+              </div>
+              <div className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                {viewMode === 'day'
+                  ? format(selectedDate, 'd MMMM yyyy', { locale: pl })
+                  : `${format(weekDays[0], 'd', { locale: pl })}–${format(weekDays[6], 'd MMM yyyy', { locale: pl })}`
+                }
+              </div>
+            </button>
+            {showDatePicker && (
+              <DatePicker
+                selected={selectedDate}
+                onSelect={d => setSelectedDate(d)}
+                onClose={() => setShowDatePicker(false)}
+              />
+            )}
           </div>
+
           <button
-            onClick={() => setSelectedDate(d => addDays(d, 1))}
-            disabled={isCurrentDay}
+            onClick={() => viewMode === 'day' ? setSelectedDate(d => addDays(d, 1)) : nextWeek()}
+            disabled={viewMode === 'day' ? isCurrentDay : isInThisWeek}
             className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 disabled:opacity-20 transition-all"
           >
             <ChevronRight size={18} />
           </button>
-          {!isCurrentDay && (
+          {(viewMode === 'day' && !isCurrentDay) && (
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
+            >
+              Dziś
+            </button>
+          )}
+          {(viewMode === 'week' && !isInThisWeek) && (
             <button
               onClick={() => setSelectedDate(new Date())}
               className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
@@ -163,8 +286,8 @@ export default function TodayPage() {
         </button>
       </div>
 
-      {/* Progress block */}
-      {isCurrentDay && summary && summary.total > 0 && (
+      {/* Day view: Progress block */}
+      {viewMode === 'day' && isCurrentDay && summary && summary.total > 0 && (
         <div className={`rounded-2xl p-5 border transition-all ${
           allDone
             ? 'bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-900/40'
@@ -210,6 +333,29 @@ export default function TodayPage() {
         </div>
       )}
 
+      {/* Week view: header row */}
+      {viewMode === 'week' && (
+        <div className="overflow-x-auto -mx-4 px-4">
+          <div className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(42px,1fr))] gap-1 items-end mb-2">
+            <div />
+            {weekDays.map(day => (
+              <div key={day.toISOString()} className="text-center">
+                <div className="text-[10px] font-medium text-stone-400 dark:text-stone-500 uppercase">
+                  {format(day, 'EEE', { locale: pl })}
+                </div>
+                <div className={`text-sm font-semibold ${
+                  isToday(day)
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-stone-700 dark:text-stone-300'
+                }`}>
+                  {format(day, 'd')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Habits list */}
       {habits.length === 0 ? (
         <div className="text-center py-20 text-stone-400">
@@ -220,7 +366,9 @@ export default function TodayPage() {
       ) : (
         <div className="space-y-6">
           {groupedByCategory.map(({ id, name, color, habits: groupHabits }) => {
-            const done = groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
+            const done = viewMode === 'day'
+              ? groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
+              : 0
             const total = groupHabits.length
             const sectionDone = done === total
 
@@ -236,32 +384,124 @@ export default function TodayPage() {
                       {name}
                     </h3>
                     <div className="flex-1 h-px bg-warm-200 dark:bg-warm-800 ml-1" />
-                    <span className={`text-xs font-semibold tabular-nums ${
-                      sectionDone ? 'text-green-600 dark:text-green-400' : 'text-stone-400 dark:text-stone-500'
-                    }`}>
-                      {done}/{total}
-                    </span>
+                    {viewMode === 'day' && (
+                      <span className={`text-xs font-semibold tabular-nums ${
+                        sectionDone ? 'text-green-600 dark:text-green-400' : 'text-stone-400 dark:text-stone-500'
+                      }`}>
+                        {done}/{total}
+                      </span>
+                    )}
                   </div>
                 )}
-                <div className="space-y-2">
-                  {groupHabits.map(h => (
-                    <HabitCard
-                      key={h.id}
-                      habit={h}
-                      entry={entryMap[h.id]}
-                      date={dateStr}
-                      streak={streaks[h.id] ?? 0}
-                      onToggle={(habit, value) => toggleMutation.mutate({ habit, value })}
-                      onUncheck={uncheckMutation.mutate}
-                      onEdit={habit => { setEditingHabit(habit); setShowForm(true) }}
-                      onDelete={habit => {
-                        if (confirm(`Usunąć nawyk "${habit.name}"?`)) {
-                          deleteHabitMutation.mutate(habit.id)
-                        }
-                      }}
-                    />
-                  ))}
-                </div>
+
+                {viewMode === 'day' ? (
+                  <div className="space-y-2">
+                    {groupHabits.map((h, idx) => {
+                      const globalIdx = habits.findIndex(gh => gh.id === h.id)
+                      return (
+                        <div key={h.id} className="flex gap-1">
+                          {editOrder && (
+                            <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 mr-0.5">
+                              <button
+                                onClick={() => moveHabit(globalIdx, -1)}
+                                disabled={globalIdx === 0}
+                                className="p-0.5 text-stone-300 dark:text-stone-600 hover:text-primary-500 disabled:opacity-20 transition-colors"
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                              <button
+                                onClick={() => moveHabit(globalIdx, 1)}
+                                disabled={globalIdx === habits.length - 1}
+                                className="p-0.5 text-stone-300 dark:text-stone-600 hover:text-primary-500 disabled:opacity-20 transition-colors"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <HabitCard
+                              habit={h}
+                              entry={entryMap[h.id]}
+                              date={format(selectedDate, 'yyyy-MM-dd')}
+                              streak={streaks[h.id] ?? 0}
+                              onToggle={(habit, value) =>
+                                toggleMutation.mutate({ habit, date: format(selectedDate, 'yyyy-MM-dd'), value })
+                              }
+                              onUncheck={(habit) =>
+                                uncheckMutation.mutate({ habit, date: format(selectedDate, 'yyyy-MM-dd') })
+                              }
+                              onEdit={habit => { setEditingHabit(habit); setShowForm(true) }}
+                              onDelete={habit => setConfirmDelete(habit)}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto -mx-4 px-4">
+                    <div className="space-y-1">
+                      {groupHabits.map(h => (
+                        <div
+                          key={h.id}
+                          className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(42px,1fr))] gap-1 items-center py-1"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs font-medium text-stone-700 dark:text-stone-300 truncate">
+                              {h.name}
+                            </span>
+                            {(streaks[h.id] ?? 0) > 0 && (
+                              <span className="text-[10px] font-medium text-orange-500 flex-shrink-0">
+                                {streaks[h.id]}
+                              </span>
+                            )}
+                          </div>
+                          {weekDays.map(day => {
+                            const dateStr = format(day, 'yyyy-MM-dd')
+                            const entry = weekEntryMap[h.id]?.[dateStr]
+                            const dayDone = !!entry && entry.value > 0
+                            const isPausedOnDay = h.is_paused && (
+                              (!h.pause_start || new Date(h.pause_start) <= day) &&
+                              (!h.pause_end || new Date(h.pause_end) >= day)
+                            )
+                            const isFuture = isAfter(day, new Date())
+
+                            return (
+                              <div key={dateStr} className="flex justify-center">
+                                <button
+                                  onClick={() => {
+                                    if (isFuture || isPausedOnDay) return
+                                    if (dayDone) {
+                                      uncheckMutation.mutate({ habit: h, date: dateStr })
+                                    } else if (h.mode === 'quantitative') {
+                                      toggleMutation.mutate({ habit: h, date: dateStr, value: 1 })
+                                    } else {
+                                      toggleMutation.mutate({ habit: h, date: dateStr })
+                                    }
+                                  }}
+                                  disabled={isFuture || isPausedOnDay}
+                                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all touch-manipulation ${
+                                    isPausedOnDay
+                                      ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 text-amber-400'
+                                      : isFuture
+                                        ? 'border border-warm-100 dark:border-warm-800 text-transparent'
+                                        : dayDone
+                                          ? 'bg-green-500 text-white shadow-sm shadow-green-200'
+                                          : isToday(day)
+                                            ? 'border-2 border-primary-400 dark:border-primary-600 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
+                                            : 'border border-warm-200 dark:border-warm-800 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
+                                  }`}
+                                >
+                                  {dayDone ? <Check size={14} strokeWidth={2.5} /> : null}
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -282,6 +522,16 @@ export default function TodayPage() {
           onClose={() => { setShowForm(false); setEditingHabit(undefined) }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Usuń nawyk"
+        message={`Czy na pewno chcesz usunąć nawyk "${confirmDelete?.name}"? Zostanie on dezaktywowany — dane pozostaną w bazie.`}
+        confirmLabel="Usuń"
+        danger
+        onConfirm={() => confirmDelete && deleteHabitMutation.mutate(confirmDelete.id)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

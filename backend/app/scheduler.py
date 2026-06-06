@@ -43,7 +43,7 @@ async def run_daily_summary():
                 continue
             scheduled = stats_lib.get_scheduled_dates(h, today, today)
             if scheduled and h.id not in entries_done_today:
-                pending.append({"name": h.name, "time_of_day": h.time_of_day})
+                pending.append({"name": h.name})
 
         logger.info(f"Daily summary: {len(habits)} active habits, {len(pending)} pending, sending to {settings.notification_email}")
         if pending:

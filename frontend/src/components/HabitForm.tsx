@@ -59,7 +59,6 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
       category_id: form.category_id ? parseInt(form.category_id) : null,
       schedule_type: form.schedule_type as Habit['schedule_type'],
       schedule_params,
-      time_of_day: null,
       reminder_time: form.reminder_time || null,
       is_paused: form.is_paused,
       pause_start: form.is_paused && form.pause_start ? form.pause_start : null,
@@ -70,12 +69,12 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-white dark:bg-gray-900 px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <div className="relative bg-white dark:bg-warm-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-white dark:bg-warm-900 px-6 pt-5 pb-4 border-b border-warm-200 dark:border-warm-800 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
             {habit ? 'Edytuj nawyk' : 'Nowy nawyk'}
           </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-500">
             <X size={20} />
           </button>
         </div>
@@ -83,34 +82,34 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nazwa *</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Nazwa *</label>
             <input
               required
               value={form.name}
               onChange={e => set('name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="np. Medytacja"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Opis</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Opis</label>
             <textarea
               rows={2}
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
             />
           </div>
 
           {/* Mode */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tryb</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Tryb</label>
             <select
               value={form.mode}
               onChange={e => set('mode', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
             >
               <option value="binary">Tak/Nie</option>
               <option value="quantitative">Ilościowy</option>
@@ -121,21 +120,21 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
           {form.mode === 'quantitative' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cel liczbowy</label>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Cel liczbowy</label>
                 <input
                   type="number"
                   value={form.goal_value}
                   onChange={e => set('goal_value', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
                   placeholder="np. 2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Jednostka</label>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Jednostka</label>
                 <input
                   value={form.goal_unit}
                   onChange={e => set('goal_unit', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
                   placeholder="np. L, strony, km"
                 />
               </div>
@@ -144,11 +143,11 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kategoria</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Kategoria</label>
             <select
               value={form.category_id}
               onChange={e => set('category_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
             >
               <option value="">Brak kategorii</option>
               {categories.map(c => (
@@ -159,11 +158,11 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
 
           {/* Schedule */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Częstotliwość</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Częstotliwość</label>
             <select
               value={form.schedule_type}
               onChange={e => set('schedule_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
             >
               <option value="daily">Codziennie</option>
               <option value="weekly_x">X razy w tygodniu</option>
@@ -177,9 +176,9 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
                   type="number" min="1" max="7"
                   value={weeklyTimes}
                   onChange={e => setWeeklyTimes(e.target.value)}
-                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-20 px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400">razy w tygodniu</span>
+                <span className="text-sm text-stone-600 dark:text-stone-400">razy w tygodniu</span>
               </div>
             )}
 
@@ -193,7 +192,7 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       weeklyDays.includes(i)
                         ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                        : 'bg-warm-100 dark:bg-warm-800 text-stone-700 dark:text-stone-300'
                     }`}
                   >
                     {day}
@@ -208,21 +207,21 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
                   type="number" min="1" max="31"
                   value={monthlyTimes}
                   onChange={e => setMonthlyTimes(e.target.value)}
-                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-20 px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400">razy w miesiącu</span>
+                <span className="text-sm text-stone-600 dark:text-stone-400">razy w miesiącu</span>
               </div>
             )}
           </div>
 
           {/* Reminder */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Godzina przypomnienia</label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Godzina przypomnienia</label>
             <input
               type="time"
               value={form.reminder_time}
               onChange={e => set('reminder_time', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
             />
           </div>
 
@@ -233,29 +232,29 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
                 type="checkbox"
                 checked={form.is_paused}
                 onChange={e => set('is_paused', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="w-4 h-4 rounded border-warm-300 text-primary-600 focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Nawyk wstrzymany (pauza)</span>
+              <span className="text-sm text-stone-700 dark:text-stone-300">Nawyk wstrzymany (pauza)</span>
             </label>
             {form.is_paused && (
               <div className="grid grid-cols-2 gap-4 pl-7">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pauza od</label>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Pauza od</label>
                   <input
                     type="date"
                     value={form.pause_start}
                     onChange={e => set('pause_start', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pauza do (opcjonalnie)</label>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Pauza do (opcjonalnie)</label>
                   <input
                     type="date"
                     value={form.pause_end}
                     onChange={e => set('pause_end', e.target.value)}
                     min={form.pause_start || undefined}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -267,7 +266,7 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-medium"
+              className="flex-1 px-4 py-2.5 border border-warm-200 dark:border-warm-800 rounded-xl text-stone-700 dark:text-stone-300 hover:bg-warm-50 dark:hover:bg-warm-800 font-medium"
             >
               Anuluj
             </button>

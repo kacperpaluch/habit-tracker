@@ -2,7 +2,6 @@ export interface Category {
   id: number
   name: string
   color: string
-  icon: string
   created_at: string
 }
 
@@ -17,7 +16,6 @@ export interface Habit {
   category: Category | null
   schedule_type: 'daily' | 'weekly_x' | 'weekly_days' | 'monthly_x'
   schedule_params: Record<string, unknown>
-  time_of_day: 'morning' | 'afternoon' | 'evening' | null
   reminder_time: string | null
   is_active: boolean
   is_paused: boolean

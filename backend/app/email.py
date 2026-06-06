@@ -42,10 +42,8 @@ async def send_daily_reminder(settings: Settings, habits: list):
     if not habits:
         return
 
-    TIME_OF_DAY_PL = {"morning": "rano", "afternoon": "południe", "evening": "wieczór"}
     rows = "".join(
-        f"<tr><td style='padding:8px;border-bottom:1px solid #eee'>{h['name']}</td>"
-        f"<td style='padding:8px;border-bottom:1px solid #eee'>{TIME_OF_DAY_PL.get(h.get('time_of_day', ''), h.get('time_of_day', ''))}</td></tr>"
+        f"<tr><td style='padding:8px;border-bottom:1px solid #eee'>{h['name']}</td></tr>"
         for h in habits
     )
     body = f"""
@@ -55,7 +53,6 @@ async def send_daily_reminder(settings: Settings, habits: list):
       <thead>
         <tr>
           <th style="padding:8px;text-align:left;border-bottom:2px solid #6366f1">Nawyk</th>
-          <th style="padding:8px;text-align:left;border-bottom:2px solid #6366f1">Pora dnia</th>
         </tr>
       </thead>
       <tbody>{rows}</tbody>

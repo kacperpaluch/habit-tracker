@@ -1,6 +1,6 @@
 services:
   habit-tracker:
-    build: .
+    image: kpa90/habit-tracker:latest
     ports:
       - "8000:8000"
     volumes:

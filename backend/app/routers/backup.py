@@ -33,7 +33,7 @@ def _export_data(db: Session) -> dict:
         "version": 1,
         "exported_at": datetime.utcnow().isoformat(),
         "categories": [
-            {"id": c.id, "name": c.name, "color": c.color, "icon": c.icon}
+            {"id": c.id, "name": c.name, "color": c.color}
             for c in cats
         ],
         "habits": [
@@ -42,7 +42,7 @@ def _export_data(db: Session) -> dict:
                 "mode": h.mode,
                 "goal_value": h.goal_value, "goal_unit": h.goal_unit,
                 "category_id": h.category_id, "schedule_type": h.schedule_type,
-                "schedule_params": h.schedule_params, "time_of_day": h.time_of_day,
+                "schedule_params": h.schedule_params,
                 "reminder_time": h.reminder_time, "is_active": h.is_active,
                 "is_paused": h.is_paused, "order": h.order,
                 "created_at": h.created_at.isoformat() if h.created_at else None,
@@ -91,7 +91,7 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
         # Re-insert categories
         cat_map = {}
         for c in data.get("categories", []):
-            cat = Category(name=c["name"], color=c.get("color", "#6366f1"), icon=c.get("icon", "tag"))
+            cat = Category(name=c["name"], color=c.get("color", "#6366f1"))
             db.add(cat)
             db.flush()
             cat_map[c["id"]] = cat.id
@@ -106,7 +106,7 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
                 category_id=cat_map.get(h.get("category_id")),
                 schedule_type=h.get("schedule_type", "daily"),
                 schedule_params=h.get("schedule_params", {}),
-                time_of_day=h.get("time_of_day"), reminder_time=h.get("reminder_time"),
+                reminder_time=h.get("reminder_time"),
                 is_active=h.get("is_active", True), is_paused=h.get("is_paused", False),
                 order=h.get("order", 0),
             )
