@@ -12,9 +12,15 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 @router.get("/all-habits", response_model=List[HabitStats])
-def all_habits_stats(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    """Return stats for all active habits in a single request."""
-    habits = db.query(Habit).filter(Habit.is_active == True).all()
+def all_habits_stats(
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    query = db.query(Habit)
+    if not include_inactive:
+        query = query.filter(Habit.is_active == True)
+    habits = query.all()
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
     month_start = today.replace(day=1)

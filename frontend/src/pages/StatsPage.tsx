@@ -1,14 +1,17 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   AreaChart, Area, ReferenceLine,
 } from 'recharts'
-import { Flame, Target, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Activity } from 'lucide-react'
+import { Flame, Target, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Activity, Archive, RotateCcw } from 'lucide-react'
 import { format } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import toast from 'react-hot-toast'
 import { habitsApi, statsApi } from '../api/habits'
 import Heatmap from '../components/Heatmap'
+import ConfirmDialog from '../components/ConfirmDialog'
+import type { Habit } from '../types'
 
 function momentumColor(m: number) {
   if (m > 0) return 'text-green-600 dark:text-green-400'
@@ -17,11 +20,20 @@ function momentumColor(m: number) {
 }
 
 export default function StatsPage() {
+  const qc = useQueryClient()
   const [year, setYear] = useState(new Date().getFullYear())
   const [selectedHabit, setSelectedHabit] = useState<number | null>(null)
   const [momentumDays, setMomentumDays] = useState(90)
+  const [showArchive, setShowArchive] = useState(false)
+  const [confirmRestore, setConfirmRestore] = useState<Habit | null>(null)
 
-  const { data: habits = [] } = useQuery({ queryKey: ['habits'], queryFn: habitsApi.list })
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits', showArchive],
+    queryFn: () => habitsApi.list(showArchive),
+  })
+
+  const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits])
+  const archivedHabits = useMemo(() => showArchive ? habits.filter(h => !h.is_active) : [], [showArchive, habits])
 
   const { data: heatmap = [] } = useQuery({
     queryKey: ['heatmap', year, selectedHabit],
@@ -29,10 +41,19 @@ export default function StatsPage() {
   })
 
   const { data: allStats = [] } = useQuery({
-    queryKey: ['all-stats'],
-    queryFn: statsApi.allStats,
+    queryKey: ['all-stats', showArchive],
+    queryFn: () => statsApi.allStats(showArchive),
     enabled: habits.length > 0,
   })
+
+  const archivedStats = useMemo(
+    () => showArchive ? allStats.filter(s => !activeHabits.some(h => h.id === s.habit_id)) : [],
+    [showArchive, allStats, activeHabits]
+  )
+  const activeStats = useMemo(
+    () => showArchive ? archivedStats : allStats,
+    [showArchive, allStats, archivedStats]
+  )
 
   const { data: momentumHistory = [] } = useQuery({
     queryKey: ['momentum-history', selectedHabit, momentumDays],
@@ -40,7 +61,17 @@ export default function StatsPage() {
     enabled: !!selectedHabit,
   })
 
-  const chartData = allStats.map(s => ({
+  const restoreMutation = useMutation({
+    mutationFn: (id: number) => habitsApi.restore(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      qc.invalidateQueries({ queryKey: ['all-stats'] })
+      setConfirmRestore(null)
+      toast.success('Nawyk przywrócony!')
+    },
+  })
+
+  const chartData = activeStats.map(s => ({
     name: s.habit_name.length > 15 ? s.habit_name.slice(0, 12) + '…' : s.habit_name,
     completions: s.total_completions,
   }))
@@ -52,85 +83,134 @@ export default function StatsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <h1 className="font-serif text-3xl text-stone-900 dark:text-stone-100">Statystyki</h1>
-
-      {/* Stat cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {allStats.map(s => (
-          <div
-            key={s.habit_id}
-            onClick={() => setSelectedHabit(s.habit_id === selectedHabit ? null : s.habit_id)}
-            className={`bg-white dark:bg-warm-900 rounded-2xl p-4 border cursor-pointer transition-all ${
-              selectedHabit === s.habit_id
-                ? 'border-primary-400 dark:border-primary-600 shadow-md shadow-primary-200/30 dark:shadow-primary-900/30'
-                : 'border-warm-200 dark:border-warm-800 hover:border-warm-300 dark:hover:border-warm-700 hover:shadow-sm'
+      <div className="flex items-center justify-between">
+        <h1 className="font-serif text-3xl text-stone-900 dark:text-stone-100">Statystyki</h1>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setShowArchive(false); setSelectedHabit(null) }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              !showArchive
+                ? 'bg-primary-600 text-white'
+                : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
             }`}
           >
-            <p className="text-xs text-stone-400 dark:text-stone-500 truncate mb-2 font-medium">{s.habit_name}</p>
-
-            {/* Streak */}
-            <div className="flex items-baseline gap-1.5">
-              <Flame size={14} className="text-orange-500 flex-shrink-0 self-center" />
-              <span className="font-serif text-3xl text-stone-900 dark:text-stone-100 leading-none">{s.current_streak}</span>
-              <span className="text-xs text-stone-400">dni</span>
-            </div>
-            <p className="text-xs text-stone-400 mt-0.5">Rekord: <span className="font-medium">{s.longest_streak}</span></p>
-
-            {/* Completion rates */}
-            <div className="mt-2.5 flex gap-3 text-xs text-stone-500">
-              <span>Tydz.: <strong className="text-stone-700 dark:text-stone-300">{s.completion_rate_week}%</strong></span>
-              <span>Mies.: <strong className="text-stone-700 dark:text-stone-300">{s.completion_rate_month}%</strong></span>
-            </div>
-
-            {/* Momentum */}
-            <div className="mt-2.5 pt-2.5 border-t border-warm-100 dark:border-warm-800 flex items-center gap-1.5">
-              {s.momentum >= 0
-                ? <TrendingUp size={12} className="text-green-500 flex-shrink-0" />
-                : <TrendingDown size={12} className="text-red-400 flex-shrink-0" />
-              }
-              <span className={`font-serif text-lg leading-none ${momentumColor(s.momentum)}`}>
-                {s.momentum > 0 ? '+' : ''}{s.momentum}
-              </span>
-              <span className="text-xs text-stone-400">rytm</span>
-            </div>
-          </div>
-        ))}
+            Aktywne
+          </button>
+          <button
+            onClick={() => setShowArchive(true)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+              showArchive
+                ? 'bg-primary-600 text-white'
+                : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
+            }`}
+          >
+            <Archive size={12} />
+            Archiwum
+          </button>
+        </div>
       </div>
+
+      {showArchive && archivedHabits.length > 0 && (
+        <p className="text-xs text-stone-400 dark:text-stone-500 -mb-3">
+          Dane historyczne zarchiwizowanych nawyków — przywróć, by śledzić na nowo
+        </p>
+      )}
+
+      {/* Stat cards grid */}
+      {activeStats.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {activeStats.map(s => (
+            <div
+              key={s.habit_id}
+              onClick={() => setSelectedHabit(s.habit_id === selectedHabit ? null : s.habit_id)}
+              className={`bg-white dark:bg-warm-900 rounded-2xl p-4 border cursor-pointer transition-all ${
+                selectedHabit === s.habit_id
+                  ? 'border-primary-400 dark:border-primary-600 shadow-md shadow-primary-200/30 dark:shadow-primary-900/30'
+                  : 'border-warm-200 dark:border-warm-800 hover:border-warm-300 dark:hover:border-warm-700 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-2">
+                <p className="text-xs text-stone-400 dark:text-stone-500 truncate font-medium flex-1">{s.habit_name}</p>
+                {showArchive && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmRestore(archivedHabits.find(h => h.id === s.habit_id)!) }}
+                    className="p-1 rounded-full hover:bg-green-100 dark:hover:bg-green-900/20 text-green-500 transition-colors flex-shrink-0"
+                    title="Przywróć"
+                  >
+                    <RotateCcw size={10} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <Flame size={14} className="text-orange-500 flex-shrink-0 self-center" />
+                <span className="font-serif text-3xl text-stone-900 dark:text-stone-100 leading-none">{s.current_streak}</span>
+                <span className="text-xs text-stone-400">dni</span>
+              </div>
+              <p className="text-xs text-stone-400 mt-0.5">Rekord: <span className="font-medium">{s.longest_streak}</span></p>
+              <div className="mt-2.5 flex gap-3 text-xs text-stone-500">
+                <span>Tydz.: <strong className="text-stone-700 dark:text-stone-300">{s.completion_rate_week}%</strong></span>
+                <span>Mies.: <strong className="text-stone-700 dark:text-stone-300">{s.completion_rate_month}%</strong></span>
+              </div>
+              <div className="mt-2.5 pt-2.5 border-t border-warm-100 dark:border-warm-800 flex items-center gap-1.5">
+                {s.momentum >= 0
+                  ? <TrendingUp size={12} className="text-green-500 flex-shrink-0" />
+                  : <TrendingDown size={12} className="text-red-400 flex-shrink-0" />
+                }
+                <span className={`font-serif text-lg leading-none ${momentumColor(s.momentum)}`}>
+                  {s.momentum > 0 ? '+' : ''}{s.momentum}
+                </span>
+                <span className="text-xs text-stone-400">rytm</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeStats.length === 0 && (
+        <div className="text-center py-16 text-stone-400">
+          <Archive className="mx-auto mb-3 opacity-20" size={40} />
+          <p className="text-stone-400 dark:text-stone-500 text-sm">
+            {showArchive ? 'Archiwum jest puste' : 'Brak danych'}
+          </p>
+        </div>
+      )}
 
       {/* Heatmap */}
-      <div className="bg-white dark:bg-warm-900 rounded-2xl p-5 border border-warm-200 dark:border-warm-800">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-stone-900 dark:text-stone-100">
-            Aktywność {selectedHabit ? `— ${selectedHabitName}` : '— wszystkie'}
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setYear(y => y - 1)}
-              className="p-1.5 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-400 transition-all"
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <span className="text-sm font-medium text-stone-700 dark:text-stone-300 min-w-[3rem] text-center">{year}</span>
-            <button
-              onClick={() => setYear(y => y + 1)}
-              disabled={year >= new Date().getFullYear()}
-              className="p-1.5 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-400 disabled:opacity-30 transition-all"
-            >
-              <ChevronRight size={15} />
-            </button>
+      {activeStats.length > 0 && (
+        <div className="bg-white dark:bg-warm-900 rounded-2xl p-5 border border-warm-200 dark:border-warm-800">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-stone-900 dark:text-stone-100">
+              Aktywność {selectedHabit ? `— ${selectedHabitName}` : '— wszystkie'}
+            </h2>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setYear(y => y - 1)}
+                className="p-1.5 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-400 transition-all"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <span className="text-sm font-medium text-stone-700 dark:text-stone-300 min-w-[3rem] text-center">{year}</span>
+              <button
+                onClick={() => setYear(y => y + 1)}
+                disabled={year >= new Date().getFullYear()}
+                className="p-1.5 rounded-full hover:bg-warm-100 dark:hover:bg-warm-800 text-stone-400 disabled:opacity-30 transition-all"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+          <Heatmap data={heatmap} year={year} />
+          <div className="flex items-center gap-2 mt-3 justify-end">
+            <span className="text-xs text-stone-400">Mniej</span>
+            <div className="w-3.5 h-3.5 rounded-sm bg-warm-200 dark:bg-warm-800" />
+            <div className="w-3.5 h-3.5 rounded-sm bg-primary-200 dark:bg-primary-900" />
+            <div className="w-3.5 h-3.5 rounded-sm bg-primary-300 dark:bg-primary-700" />
+            <div className="w-3.5 h-3.5 rounded-sm bg-primary-500" />
+            <div className="w-3.5 h-3.5 rounded-sm bg-primary-700 dark:bg-primary-400" />
+            <span className="text-xs text-stone-400">Więcej</span>
           </div>
         </div>
-        <Heatmap data={heatmap} year={year} />
-        <div className="flex items-center gap-2 mt-3 justify-end">
-          <span className="text-xs text-stone-400">Mniej</span>
-          <div className="w-3.5 h-3.5 rounded-sm bg-warm-200 dark:bg-warm-800" />
-          <div className="w-3.5 h-3.5 rounded-sm bg-primary-200 dark:bg-primary-900" />
-          <div className="w-3.5 h-3.5 rounded-sm bg-primary-300 dark:bg-primary-700" />
-          <div className="w-3.5 h-3.5 rounded-sm bg-primary-500" />
-          <div className="w-3.5 h-3.5 rounded-sm bg-primary-700 dark:bg-primary-400" />
-          <span className="text-xs text-stone-400">Więcej</span>
-        </div>
-      </div>
+      )}
 
       {/* Momentum trend */}
       {selectedHabit && (
@@ -156,11 +236,9 @@ export default function StatsPage() {
               ))}
             </div>
           </div>
-
           <p className="text-xs text-stone-400 mb-4">
             Każdy kolejny wykonany dzień dodaje coraz więcej punktów (+1, +2, +3…); każde pominięcie odejmuje (−1, −2, −3…)
           </p>
-
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={momentumHistory} margin={{ top: 5, right: 8, bottom: 25, left: 8 }}>
               <defs>
@@ -204,7 +282,6 @@ export default function StatsPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
-
           {momentumHistory.length > 0 && (() => {
             const current = momentumHistory[momentumHistory.length - 1].momentum
             return (
@@ -246,7 +323,7 @@ export default function StatsPage() {
       )}
 
       {/* Summary table */}
-      {allStats.length > 0 && (
+      {activeStats.length > 0 && (
         <div className="bg-white dark:bg-warm-900 rounded-2xl border border-warm-200 dark:border-warm-800 overflow-hidden">
           <h2 className="font-semibold text-stone-900 dark:text-stone-100 p-5 pb-3 flex items-center gap-2">
             <Target size={17} className="text-primary-500" />
@@ -266,7 +343,7 @@ export default function StatsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-warm-100 dark:divide-warm-800">
-                {allStats.map(s => (
+                {activeStats.map(s => (
                   <tr key={s.habit_id} className="hover:bg-warm-50/50 dark:hover:bg-warm-850/30 transition-colors">
                     <td className="px-5 py-3 font-medium text-stone-900 dark:text-stone-100">{s.habit_name}</td>
                     <td className="px-4 py-3 text-center">
@@ -298,6 +375,15 @@ export default function StatsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmRestore !== null}
+        title="Przywróć nawyk"
+        message={`Czy na pewno chcesz przywrócić nawyk "${confirmRestore?.name}"? Pojawi się ponownie w widoku dziennym.`}
+        confirmLabel="Przywróć"
+        onConfirm={() => confirmRestore && restoreMutation.mutate(confirmRestore.id)}
+        onCancel={() => setConfirmRestore(null)}
+      />
     </div>
   )
 }

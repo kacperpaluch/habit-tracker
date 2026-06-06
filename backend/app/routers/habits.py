@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from ..database import get_db
@@ -10,14 +10,15 @@ router = APIRouter(prefix="/api/habits", tags=["habits"])
 
 
 @router.get("", response_model=List[HabitOut])
-def list_habits(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return (
-        db.query(Habit)
-        .options(joinedload(Habit.category))
-        .filter(Habit.is_active == True)
-        .order_by(Habit.order, Habit.id)
-        .all()
-    )
+def list_habits(
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    query = db.query(Habit).options(joinedload(Habit.category))
+    if not include_inactive:
+        query = query.filter(Habit.is_active == True)
+    return query.order_by(Habit.order, Habit.id).all()
 
 
 @router.post("", response_model=HabitOut, status_code=201)
@@ -57,12 +58,39 @@ def update_habit(habit_id: int, data: HabitUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/{habit_id}", status_code=204)
-def delete_habit(habit_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def archive_habit(habit_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
     if not habit:
         raise HTTPException(404, "Habit not found")
     habit.is_active = False
     db.commit()
+
+
+@router.delete("/{habit_id}/hard", status_code=204)
+def hard_delete_habit(habit_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    habit = db.query(Habit).filter(Habit.id == habit_id).first()
+    if not habit:
+        raise HTTPException(404, "Habit not found")
+    db.delete(habit)
+    db.commit()
+
+
+@router.put("/{habit_id}/restore", response_model=HabitOut)
+def restore_habit(habit_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    habit = (
+        db.query(Habit)
+        .options(joinedload(Habit.category))
+        .filter(Habit.id == habit_id)
+        .first()
+    )
+    if not habit:
+        raise HTTPException(404, "Habit not found")
+    habit.is_active = True
+    habit.is_paused = False
+    db.commit()
+    db.refresh(habit)
+    db.refresh(habit, ["category"])
+    return habit
 
 
 @router.post("/reorder", status_code=204)

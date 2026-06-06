@@ -11,12 +11,14 @@ Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Dział
 - **Uzupełnianie wstecz** — odznaczanie poprzednich dni z interfejsu; date picker do szybkiego skoku do daty
 - **Notatki do wpisów** — adnotacja przy każdym wpisie: zarówno po wykonaniu nawyku, jak i przy pominięciu (np. "dlaczego dziś nie?")
 - **Kategorie** z kolorem — grupowanie nawyków w widoku dziennym wg kategorii
+- **Archiwum** — przenieś nieaktywny nawyk do archiwum (dane zostają, przestaje zaśmiecać widok); przywracanie jednym kliknięciem z poziomu Dziś lub Statystyk; pełne statystyki historyczne dostępne dla zarchiwizowanych nawyków bez konieczności przywracania
+- **Usuwanie na stałe** — hard-delete nawyku wraz ze wszystkimi wpisami i notatkami (nieodwracalne)
 - **Zmiana kolejności nawyków** — strzałki góra/dół w trybie edycji, kolejność zapisywana globalnie
 - **Streaki** — aktualny i najdłuższy, per nawyk (uwzględnia wpisy wstecz przed datą tworzenia nawyku)
 - **System rytmu (momentum)** — triangularna akumulacja punktów: każdy kolejny wykonany dzień dodaje coraz więcej (+1, +2, +3…), każde pominięcie odejmuje (-1, -2, -3…); widoczny na kartach i w tabeli
 - **Trend rytmu** — wykres AreaChart historii momentum (30/90/180 dni) z linią zerową
 - **Heatmapa** — widok aktywności rocznej (styl GitHub) z interaktywnym tooltipem
-- **Statystyki** — % realizacji tygodniowej i miesięcznej, tabela porównawcza z kolumną rytmu
+- **Statystyki** — % realizacji tygodniowej i miesięcznej, tabela porównawcza z kolumną rytmu; przełącznik Aktywne/Archiwum z pełnymi danymi dla obu widoków
 - **Kalendarz** — widok miesięczny wykonanych/pominiętych/zapauzowanych dni
 - **Powiadomienia e-mail** — dzienne podsumowanie przez SMTP
 - **Backup/Eksport/Import** — automatyczny backup SQLite z retencją, eksport JSON

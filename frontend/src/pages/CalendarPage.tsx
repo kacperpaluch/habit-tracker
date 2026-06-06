@@ -16,7 +16,7 @@ export default function CalendarPage() {
   const year = current.getFullYear()
   const month = current.getMonth() + 1
 
-  const { data: habits = [] } = useQuery({ queryKey: ['habits'], queryFn: habitsApi.list })
+  const { data: habits = [] } = useQuery({ queryKey: ['habits'], queryFn: () => habitsApi.list() })
 
   const { data: days = [] } = useQuery<CalendarDay[]>({
     queryKey: ['calendar', selectedHabit, year, month],

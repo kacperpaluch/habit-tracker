@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper, GripVertical, ChevronUp, ChevronDown, Check } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper, GripVertical, ChevronUp, ChevronDown, Check, Archive } from 'lucide-react'
 import { format, addDays, subDays, isToday, isAfter, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -23,6 +23,8 @@ export default function TodayPage() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [editOrder, setEditOrder] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null)
+  const [confirmHardDelete, setConfirmHardDelete] = useState<Habit | null>(null)
+  const [showArchive, setShowArchive] = useState(false)
 
   const isCurrentDay = isToday(selectedDate)
 
@@ -36,22 +38,29 @@ export default function TodayPage() {
   const entriesFrom = viewMode === 'week' ? format(weekDays[0] || selectedDate, 'yyyy-MM-dd') : format(selectedDate, 'yyyy-MM-dd')
   const entriesTo = viewMode === 'week' ? format(weekDays[6] || selectedDate, 'yyyy-MM-dd') : format(selectedDate, 'yyyy-MM-dd')
 
-  const { data: habits = [] } = useQuery({ queryKey: ['habits'], queryFn: habitsApi.list })
+  const { data: habits = [] } = useQuery({
+    queryKey: ['habits', showArchive],
+    queryFn: () => habitsApi.list(showArchive),
+  })
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
   const { data: entries = [] } = useQuery({
     queryKey: ['entries', entriesFrom, entriesTo],
     queryFn: () => entriesApi.list({ date_from: entriesFrom, date_to: entriesTo }),
+    enabled: !showArchive,
   })
   const { data: summary } = useQuery({
     queryKey: ['summary'],
     queryFn: statsApi.summary,
-    enabled: isCurrentDay && viewMode === 'day',
+    enabled: isCurrentDay && viewMode === 'day' && !showArchive,
   })
   const { data: allStatsData = [] } = useQuery({
     queryKey: ['all-stats'],
-    queryFn: statsApi.allStats,
-    enabled: habits.length > 0,
+    queryFn: () => statsApi.allStats(),
+    enabled: habits.length > 0 && !showArchive,
   })
+
+  const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits])
+  const archivedHabits = useMemo(() => showArchive ? habits.filter(h => !h.is_active) : [], [showArchive, habits])
 
   const entryMap = useMemo(() => {
     const m: Record<number, Entry> = {}
@@ -117,8 +126,30 @@ export default function TodayPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['habits'] })
       qc.invalidateQueries({ queryKey: ['entries'] })
+      qc.invalidateQueries({ queryKey: ['all-stats'] })
       setConfirmDelete(null)
-      toast.success('Nawyk usunięty')
+      toast.success('Nawyk przeniesiony do archiwum')
+    },
+  })
+
+  const hardDeleteHabitMutation = useMutation({
+    mutationFn: (id: number) => habitsApi.hardDelete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      qc.invalidateQueries({ queryKey: ['entries'] })
+      qc.invalidateQueries({ queryKey: ['all-stats'] })
+      qc.invalidateQueries({ queryKey: ['heatmap'] })
+      qc.invalidateQueries({ queryKey: ['momentum-history'] })
+      setConfirmHardDelete(null)
+      toast.success('Nawyk usunięty na stałe')
+    },
+  })
+
+  const restoreHabitMutation = useMutation({
+    mutationFn: (id: number) => habitsApi.restore(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      toast.success('Nawyk przywrócony!')
     },
   })
 
@@ -130,7 +161,8 @@ export default function TodayPage() {
   const groupedByCategory = useMemo(() => {
     const byId: Record<number, Habit[]> = {}
     const uncategorized: Habit[] = []
-    habits.forEach(h => {
+    const list = showArchive ? archivedHabits : activeHabits
+    list.forEach(h => {
       if (h.category_id != null) {
         if (!byId[h.category_id]) byId[h.category_id] = []
         byId[h.category_id].push(h)
@@ -148,12 +180,12 @@ export default function TodayPage() {
       result.push({ id: null, name: 'Bez kategorii', color: '#b8a898', habits: uncategorized })
     }
     return result
-  }, [habits, categories])
+  }, [activeHabits, archivedHabits, categories, showArchive])
 
-  const allDone = isCurrentDay && viewMode === 'day' && summary && summary.total > 0 && summary.done === summary.total
+  const allDone = isCurrentDay && viewMode === 'day' && !showArchive && summary && summary.total > 0 && summary.done === summary.total
 
   const moveHabit = (index: number, direction: -1 | 1) => {
-    const newHabits = [...habits]
+    const newHabits = [...activeHabits]
     const targetIndex = index + direction
     if (targetIndex < 0 || targetIndex >= newHabits.length) return
     ;[newHabits[index], newHabits[targetIndex]] = [newHabits[targetIndex], newHabits[index]]
@@ -174,28 +206,29 @@ export default function TodayPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setViewMode('day')}
+            onClick={() => { setShowArchive(false); setViewMode('day') }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              viewMode === 'day'
+              !showArchive
                 ? 'bg-primary-600 text-white'
                 : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
             }`}
           >
-            Dzień
+            Aktywne
           </button>
           <button
-            onClick={() => setViewMode('week')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              viewMode === 'week'
+            onClick={() => setShowArchive(true)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+              showArchive
                 ? 'bg-primary-600 text-white'
                 : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
             }`}
           >
-            Tydzień
+            <Archive size={12} />
+            Archiwum
           </button>
         </div>
         <div className="flex items-center gap-1">
-          {!editOrder && (
+          {!showArchive && !editOrder && (
             <button
               onClick={() => setEditOrder(true)}
               title="Zmień kolejność nawyków"
@@ -204,7 +237,7 @@ export default function TodayPage() {
               <GripVertical size={16} />
             </button>
           )}
-          {editOrder && (
+          {!showArchive && editOrder && (
             <button
               onClick={() => setEditOrder(false)}
               className="px-3 py-1 text-xs font-medium bg-primary-600 text-white rounded-full transition-all"
@@ -215,79 +248,105 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {/* Date navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => viewMode === 'day' ? setSelectedDate(d => subDays(d, 1)) : prevWeek()}
-            className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 transition-all"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          <div className="relative">
+      {/* Date navigation — hidden in archive */}
+      {!showArchive && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowDatePicker(v => !v)}
-              className="text-center min-w-[120px] cursor-pointer hover:bg-warm-100 dark:hover:bg-warm-850 rounded-xl py-1 px-2 transition-all"
+              onClick={() => viewMode === 'day' ? setSelectedDate(d => subDays(d, 1)) : prevWeek()}
+              className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 transition-all"
             >
-              <div className="font-semibold text-stone-900 dark:text-stone-100 capitalize text-sm">
-                {viewMode === 'day'
-                  ? (isCurrentDay ? 'Dzisiaj' : format(selectedDate, 'EEEE', { locale: pl }))
-                  : (isInThisWeek ? 'Ten tydzień' : `Tydzień ${format(weekDays[0], 'd MMM', { locale: pl })}`)
-                }
-              </div>
-              <div className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                {viewMode === 'day'
-                  ? format(selectedDate, 'd MMMM yyyy', { locale: pl })
-                  : `${format(weekDays[0], 'd', { locale: pl })}–${format(weekDays[6], 'd MMM yyyy', { locale: pl })}`
-                }
-              </div>
+              <ChevronLeft size={18} />
             </button>
-            {showDatePicker && (
-              <DatePicker
-                selected={selectedDate}
-                onSelect={d => setSelectedDate(d)}
-                onClose={() => setShowDatePicker(false)}
-              />
+
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(v => !v)}
+                className="text-center min-w-[120px] cursor-pointer hover:bg-warm-100 dark:hover:bg-warm-850 rounded-xl py-1 px-2 transition-all"
+              >
+                <div className="font-semibold text-stone-900 dark:text-stone-100 capitalize text-sm">
+                  {viewMode === 'day'
+                    ? (isCurrentDay ? 'Dzisiaj' : format(selectedDate, 'EEEE', { locale: pl }))
+                    : (isInThisWeek ? 'Ten tydzień' : `Tydzień ${format(weekDays[0], 'd MMM', { locale: pl })}`)
+                  }
+                </div>
+                <div className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                  {viewMode === 'day'
+                    ? format(selectedDate, 'd MMMM yyyy', { locale: pl })
+                    : `${format(weekDays[0], 'd', { locale: pl })}–${format(weekDays[6], 'd MMM yyyy', { locale: pl })}`
+                  }
+                </div>
+              </button>
+              {showDatePicker && (
+                <DatePicker
+                  selected={selectedDate}
+                  onSelect={d => setSelectedDate(d)}
+                  onClose={() => setShowDatePicker(false)}
+                />
+              )}
+            </div>
+
+            <button
+              onClick={() => viewMode === 'day' ? setSelectedDate(d => addDays(d, 1)) : nextWeek()}
+              disabled={viewMode === 'day' ? isCurrentDay : isInThisWeek}
+              className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 disabled:opacity-20 transition-all"
+            >
+              <ChevronRight size={18} />
+            </button>
+            {(viewMode === 'day' && !isCurrentDay) && (
+              <button
+                onClick={() => setSelectedDate(new Date())}
+                className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
+              >
+                Dziś
+              </button>
+            )}
+            {(viewMode === 'week' && !isInThisWeek) && (
+              <button
+                onClick={() => setSelectedDate(new Date())}
+                className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
+              >
+                Dziś
+              </button>
             )}
           </div>
 
-          <button
-            onClick={() => viewMode === 'day' ? setSelectedDate(d => addDays(d, 1)) : nextWeek()}
-            disabled={viewMode === 'day' ? isCurrentDay : isInThisWeek}
-            className="p-2 rounded-full hover:bg-warm-100 dark:hover:bg-warm-850 text-stone-400 disabled:opacity-20 transition-all"
-          >
-            <ChevronRight size={18} />
-          </button>
-          {(viewMode === 'day' && !isCurrentDay) && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode('day')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  viewMode === 'day'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
+                }`}
+              >
+                Dzień
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  viewMode === 'week'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-stone-500 dark:text-stone-400 hover:bg-warm-100 dark:hover:bg-warm-800'
+                }`}
+              >
+                Tydzień
+              </button>
+            </div>
             <button
-              onClick={() => setSelectedDate(new Date())}
-              className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
+              onClick={() => { setEditingHabit(undefined); setShowForm(true) }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full text-sm font-medium transition-all shadow-sm shadow-primary-600/20"
             >
-              Dziś
+              <Plus size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Nowy nawyk</span>
             </button>
-          )}
-          {(viewMode === 'week' && !isInThisWeek) && (
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className="text-xs px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium"
-            >
-              Dziś
-            </button>
-          )}
+          </div>
         </div>
-
-        <button
-          onClick={() => { setEditingHabit(undefined); setShowForm(true) }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full text-sm font-medium transition-all shadow-sm shadow-primary-600/20"
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          <span className="hidden sm:inline">Nowy nawyk</span>
-        </button>
-      </div>
+      )}
 
       {/* Day view: Progress block */}
-      {viewMode === 'day' && isCurrentDay && summary && summary.total > 0 && (
+      {!showArchive && viewMode === 'day' && isCurrentDay && summary && summary.total > 0 && (
         <div className={`rounded-2xl p-5 border transition-all ${
           allDone
             ? 'bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-900/40'
@@ -334,7 +393,7 @@ export default function TodayPage() {
       )}
 
       {/* Week view: header row */}
-      {viewMode === 'week' && (
+      {!showArchive && viewMode === 'week' && (
         <div className="overflow-x-auto -mx-4 px-4">
           <div className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(42px,1fr))] gap-1 items-end mb-2">
             <div />
@@ -357,16 +416,23 @@ export default function TodayPage() {
       )}
 
       {/* Habits list */}
-      {habits.length === 0 ? (
+      {(showArchive ? archivedHabits.length === 0 : activeHabits.length === 0) ? (
         <div className="text-center py-20 text-stone-400">
-          <Calendar className="mx-auto mb-4 opacity-20" size={52} />
-          <p className="font-serif text-xl text-stone-300 dark:text-stone-600">Brak nawyków</p>
-          <p className="text-sm mt-1.5 text-stone-400 dark:text-stone-500">Dodaj swój pierwszy nawyk!</p>
+          <Archive className="mx-auto mb-4 opacity-20" size={52} />
+          <p className="font-serif text-xl text-stone-300 dark:text-stone-600">
+            {showArchive ? 'Archiwum jest puste' : 'Brak nawyków'}
+          </p>
+          <p className="text-sm mt-1.5 text-stone-400 dark:text-stone-500">
+            {showArchive
+              ? 'Zarchiwizowane nawyki pojawią się tutaj'
+              : 'Dodaj swój pierwszy nawyk!'
+            }
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
           {groupedByCategory.map(({ id, name, color, habits: groupHabits }) => {
-            const done = viewMode === 'day'
+            const done = !showArchive && viewMode === 'day'
               ? groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
               : 0
             const total = groupHabits.length
@@ -384,7 +450,7 @@ export default function TodayPage() {
                       {name}
                     </h3>
                     <div className="flex-1 h-px bg-warm-200 dark:bg-warm-800 ml-1" />
-                    {viewMode === 'day' && (
+                    {!showArchive && viewMode === 'day' && (
                       <span className={`text-xs font-semibold tabular-nums ${
                         sectionDone ? 'text-green-600 dark:text-green-400' : 'text-stone-400 dark:text-stone-500'
                       }`}>
@@ -394,10 +460,28 @@ export default function TodayPage() {
                   </div>
                 )}
 
-                {viewMode === 'day' ? (
+                {showArchive ? (
+                  <div className="space-y-2">
+                    {groupHabits.map(h => (
+                      <HabitCard
+                        key={h.id}
+                        habit={h}
+                        entry={undefined}
+                        date={format(selectedDate, 'yyyy-MM-dd')}
+                        onToggle={() => {}}
+                        onUncheck={() => {}}
+                        onEdit={habit => { setEditingHabit(habit); setShowForm(true) }}
+                        onDelete={habit => setConfirmDelete(habit)}
+                        onHardDelete={habit => setConfirmHardDelete(habit)}
+                        onRestore={habit => restoreHabitMutation.mutate(habit.id)}
+                        archived
+                      />
+                    ))}
+                  </div>
+                ) : viewMode === 'day' ? (
                   <div className="space-y-2">
                     {groupHabits.map((h, idx) => {
-                      const globalIdx = habits.findIndex(gh => gh.id === h.id)
+                      const globalIdx = activeHabits.findIndex(gh => gh.id === h.id)
                       return (
                         <div key={h.id} className="flex gap-1">
                           {editOrder && (
@@ -411,7 +495,7 @@ export default function TodayPage() {
                               </button>
                               <button
                                 onClick={() => moveHabit(globalIdx, 1)}
-                                disabled={globalIdx === habits.length - 1}
+                                disabled={globalIdx === activeHabits.length - 1}
                                 className="p-0.5 text-stone-300 dark:text-stone-600 hover:text-primary-500 disabled:opacity-20 transition-colors"
                               >
                                 <ChevronDown size={14} />
@@ -432,6 +516,7 @@ export default function TodayPage() {
                               }
                               onEdit={habit => { setEditingHabit(habit); setShowForm(true) }}
                               onDelete={habit => setConfirmDelete(habit)}
+                              onHardDelete={habit => setConfirmHardDelete(habit)}
                             />
                           </div>
                         </div>
@@ -525,12 +610,22 @@ export default function TodayPage() {
 
       <ConfirmDialog
         open={confirmDelete !== null}
-        title="Usuń nawyk"
-        message={`Czy na pewno chcesz usunąć nawyk "${confirmDelete?.name}"? Zostanie on dezaktywowany — dane pozostaną w bazie.`}
-        confirmLabel="Usuń"
+        title="Archiwizuj nawyk"
+        message={`Czy na pewno chcesz archiwizować nawyk "${confirmDelete?.name}"? Przestanie być widoczny w widoku dziennym — dane i historia pozostaną w bazie. Możesz go przywrócić w każdej chwili z poziomu Archiwum.`}
+        confirmLabel="Archiwizuj"
         danger
         onConfirm={() => confirmDelete && deleteHabitMutation.mutate(confirmDelete.id)}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmHardDelete !== null}
+        title="Usuń nawyk na stałe"
+        message={`Czy na pewno chcesz bezpowrotnie usunąć nawyk "${confirmHardDelete?.name}"? Wszystkie wpisy, notatki i historia zostaną skasowane. Tej operacji nie można cofnąć.`}
+        confirmLabel="Usuń bezpowrotnie"
+        danger
+        onConfirm={() => confirmHardDelete && hardDeleteHabitMutation.mutate(confirmHardDelete.id)}
+        onCancel={() => setConfirmHardDelete(null)}
       />
     </div>
   )
