@@ -38,7 +38,7 @@ def create_entry(data: EntryCreate, db: Session = Depends(get_db), _=Depends(get
     if existing:
         # value=0 means "note only" — never overwrite a real completion
         if data.value > 0:
-            if habit.mode == "quantitative":
+            if habit.mode in ("quantitative", "timed"):
                 existing.value += data.value
             else:
                 existing.value = data.value

@@ -15,7 +15,7 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
   const [form, setForm] = useState({
     name: habit?.name ?? '',
     description: habit?.description ?? '',
-    mode: habit?.mode ?? 'binary' as 'binary' | 'quantitative',
+    mode: habit?.mode ?? 'binary' as Habit['mode'],
     goal_value: habit?.goal_value?.toString() ?? '',
     goal_unit: habit?.goal_unit ?? '',
     category_id: habit?.category_id?.toString() ?? '',
@@ -50,12 +50,22 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
       schedule_params = { times: parseInt(monthlyTimes) || 1 }
     }
 
+    let goal_value: number | null = null
+    let goal_unit: string | null = null
+    if (form.mode === 'quantitative') {
+      goal_value = parseFloat(form.goal_value) || null
+      goal_unit = form.goal_unit || null
+    } else if (form.mode === 'timed') {
+      goal_value = parseFloat(form.goal_value) || null
+      goal_unit = 'min'
+    }
+
     onSave({
       name: form.name,
       description: form.description,
       mode: form.mode,
-      goal_value: form.mode === 'quantitative' ? parseFloat(form.goal_value) || null : null,
-      goal_unit: form.mode === 'quantitative' ? form.goal_unit || null : null,
+      goal_value,
+      goal_unit,
       category_id: form.category_id ? parseInt(form.category_id) : null,
       schedule_type: form.schedule_type as Habit['schedule_type'],
       schedule_params,
@@ -113,8 +123,29 @@ export default function HabitForm({ habit, categories, onSave, onClose }: HabitF
             >
               <option value="binary">Tak/Nie</option>
               <option value="quantitative">Ilościowy</option>
+              <option value="timed">Czasowy (timer)</option>
+              <option value="negative">Rzucanie (nawyk negatywny)</option>
             </select>
+            {form.mode === 'negative' && (
+              <p className="mt-1.5 text-xs text-stone-400 dark:text-stone-500">
+                Dzień bez wpadki liczy się automatycznie jako sukces. Oznaczasz tylko, gdy się złamiesz.
+              </p>
+            )}
           </div>
+
+          {/* Goal (timed) */}
+          {form.mode === 'timed' && (
+            <div>
+              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Cel (minuty)</label>
+              <input
+                type="number" min="1"
+                value={form.goal_value}
+                onChange={e => set('goal_value', e.target.value)}
+                className="w-full px-3 py-2 border border-warm-200 dark:border-warm-800 rounded-lg bg-white dark:bg-warm-900 text-stone-900 dark:text-stone-100"
+                placeholder="np. 10"
+              />
+            </div>
+          )}
 
           {/* Goal (quantitative) */}
           {form.mode === 'quantitative' && (

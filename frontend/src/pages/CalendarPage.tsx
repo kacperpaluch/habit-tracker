@@ -106,8 +106,8 @@ export default function CalendarPage() {
                     isToday && 'ring-2 ring-primary-400',
                     info?.paused && 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
                     info?.completed && !info.paused && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-                    info?.scheduled && !info.completed && !info.paused && dateStr < format(new Date(), 'yyyy-MM-dd') && 'text-red-400 bg-red-50 dark:bg-red-900/10',
-                    (!info || (!info.completed && !info.paused && !(info.scheduled && dateStr < format(new Date(), 'yyyy-MM-dd')))) && 'text-stone-500 dark:text-stone-400'
+                    info?.failed && !info.completed && !info.paused && 'text-red-400 bg-red-50 dark:bg-red-900/10',
+                    (!info || (!info.completed && !info.paused && !info.failed)) && 'text-stone-500 dark:text-stone-400'
                   )}
                 >
                   {day}
@@ -122,7 +122,7 @@ export default function CalendarPage() {
               <span className="w-3 h-3 rounded-md bg-green-200 dark:bg-green-900/50" /> Wykonano
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-red-100 dark:bg-red-900/20" /> Pominięto
+              <span className="w-3 h-3 rounded-md bg-red-100 dark:bg-red-900/20" /> Pominięto / wpadka
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-md bg-amber-100 dark:bg-amber-900/20" /> Pauza

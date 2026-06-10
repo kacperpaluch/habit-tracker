@@ -9,7 +9,7 @@ export interface Habit {
   id: number
   name: string
   description: string
-  mode: 'binary' | 'quantitative'
+  mode: 'binary' | 'quantitative' | 'negative' | 'timed'
   goal_value: number | null
   goal_unit: string | null
   category_id: number | null
@@ -63,6 +63,58 @@ export interface CalendarDay {
   note: string | null
   paused: boolean
   scheduled: boolean
+  failed: boolean
+}
+
+export interface WeekdayStat {
+  weekday: number
+  rate: number
+  scheduled_count: number
+}
+
+export interface HabitWeakDay {
+  habit_id: number
+  habit_name: string
+  weekday: number
+  rate: number
+  overall_rate: number
+}
+
+export interface CorrelationInsight {
+  habit_a_id: number
+  habit_a_name: string
+  habit_b_id: number
+  habit_b_name: string
+  phi: number
+  p_b_given_a: number
+  p_b_given_not_a: number
+  shared_days: number
+}
+
+export interface DecliningHabit {
+  habit_id: number
+  habit_name: string
+  momentum_now: number
+  momentum_then: number
+  drop: number
+}
+
+export interface Insights {
+  weekday: WeekdayStat[]
+  best_day: number | null
+  worst_day: number | null
+  habit_weak_days: HabitWeakDay[]
+  correlations: CorrelationInsight[]
+  declining: DecliningHabit[]
+}
+
+/** Done semantics shared with the backend: quantitative/timed require reaching the goal. */
+export function isEntryDone(habit: Habit, entry?: Entry | null): boolean {
+  if (!entry || entry.value <= 0) return false
+  if ((habit.mode === 'quantitative' || habit.mode === 'timed') && habit.goal_value) {
+    return entry.value >= habit.goal_value
+  }
+  return true
 }
 
 export interface Settings {

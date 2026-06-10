@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper, GripVertical, ChevronUp, ChevronDown, Check, Archive } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Calendar, PartyPopper, GripVertical, ChevronUp, ChevronDown, Check, Archive, X } from 'lucide-react'
 import { format, addDays, subDays, isToday, isAfter, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import HabitCard from '../components/HabitCard'
 import HabitForm from '../components/HabitForm'
 import DatePicker from '../components/DatePicker'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { isEntryDone } from '../types'
 import type { Habit, Entry } from '../types'
 
 type ViewMode = 'day' | 'week'
@@ -433,7 +434,9 @@ export default function TodayPage() {
         <div className="space-y-6">
           {groupedByCategory.map(({ id, name, color, habits: groupHabits }) => {
             const done = !showArchive && viewMode === 'day'
-              ? groupHabits.filter(h => (entryMap[h.id]?.value ?? 0) > 0).length
+              ? groupHabits.filter(h => h.mode === 'negative'
+                  ? (entryMap[h.id]?.value ?? 0) <= 0
+                  : isEntryDone(h, entryMap[h.id])).length
               : 0
             const total = groupHabits.length
             const sectionDone = done === total
@@ -544,40 +547,52 @@ export default function TodayPage() {
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd')
                             const entry = weekEntryMap[h.id]?.[dateStr]
-                            const dayDone = !!entry && entry.value > 0
+                            const isNegative = h.mode === 'negative'
+                            const slip = isNegative && !!entry && entry.value > 0
+                            const beforeCreation = isNegative && dateStr < h.created_at.slice(0, 10)
                             const isPausedOnDay = h.is_paused && (
                               (!h.pause_start || new Date(h.pause_start) <= day) &&
                               (!h.pause_end || new Date(h.pause_end) >= day)
                             )
                             const isFuture = isAfter(day, new Date())
+                            const untracked = isFuture || beforeCreation
+                            const dayDone = isNegative
+                              ? !untracked && !isPausedOnDay && !slip
+                              : isEntryDone(h, entry)
 
                             return (
                               <div key={dateStr} className="flex justify-center">
                                 <button
                                   onClick={() => {
-                                    if (isFuture || isPausedOnDay) return
-                                    if (dayDone) {
+                                    if (untracked || isPausedOnDay) return
+                                    if (isNegative) {
+                                      if (slip) uncheckMutation.mutate({ habit: h, date: dateStr })
+                                      else toggleMutation.mutate({ habit: h, date: dateStr })
+                                    } else if (dayDone) {
                                       uncheckMutation.mutate({ habit: h, date: dateStr })
-                                    } else if (h.mode === 'quantitative') {
+                                    } else if (h.mode === 'quantitative' || h.mode === 'timed') {
                                       toggleMutation.mutate({ habit: h, date: dateStr, value: 1 })
                                     } else {
                                       toggleMutation.mutate({ habit: h, date: dateStr })
                                     }
                                   }}
-                                  disabled={isFuture || isPausedOnDay}
+                                  disabled={untracked || isPausedOnDay}
+                                  title={isNegative ? (slip ? 'Cofnij wpadkę' : 'Oznacz wpadkę') : undefined}
                                   className={`w-9 h-9 rounded-full flex items-center justify-center transition-all touch-manipulation ${
                                     isPausedOnDay
                                       ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 text-amber-400'
-                                      : isFuture
+                                      : untracked
                                         ? 'border border-warm-100 dark:border-warm-800 text-transparent'
-                                        : dayDone
-                                          ? 'bg-green-500 text-white shadow-sm shadow-green-200'
-                                          : isToday(day)
-                                            ? 'border-2 border-primary-400 dark:border-primary-600 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
-                                            : 'border border-warm-200 dark:border-warm-800 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
+                                        : slip
+                                          ? 'bg-red-500 text-white shadow-sm shadow-red-200'
+                                          : dayDone
+                                            ? 'bg-green-500 text-white shadow-sm shadow-green-200'
+                                            : isToday(day)
+                                              ? 'border-2 border-primary-400 dark:border-primary-600 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
+                                              : 'border border-warm-200 dark:border-warm-800 text-stone-300 dark:text-stone-600 hover:bg-warm-100 dark:hover:bg-warm-800'
                                   }`}
                                 >
-                                  {dayDone ? <Check size={14} strokeWidth={2.5} /> : null}
+                                  {slip ? <X size={14} strokeWidth={2.5} /> : dayDone ? <Check size={14} strokeWidth={2.5} /> : null}
                                 </button>
                               </div>
                             )

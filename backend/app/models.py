@@ -21,7 +21,7 @@ class Habit(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, default="")
-    mode = Column(String, default="binary")  # binary | quantitative
+    mode = Column(String, default="binary")  # binary | quantitative | negative | timed
     goal_value = Column(Float, nullable=True)
     goal_unit = Column(String, nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)

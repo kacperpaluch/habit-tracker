@@ -1,5 +1,5 @@
 import api from './client'
-import type { Habit, Entry, HabitStats, HeatmapEntry, CalendarDay, DailySummary, MomentumPoint } from '../types'
+import type { Habit, Entry, HabitStats, HeatmapEntry, CalendarDay, DailySummary, MomentumPoint, Insights } from '../types'
 
 export const habitsApi = {
   list: (includeInactive = false) =>
@@ -37,4 +37,5 @@ export const statsApi = {
     api.get<HabitStats[]>('/stats/all-habits', { params: includeInactive ? { include_inactive: true } : {} }).then(r => r.data),
   momentumHistory: (id: number, days = 90) =>
     api.get<MomentumPoint[]>(`/stats/momentum/${id}`, { params: { days } }).then(r => r.data),
+  insights: () => api.get<Insights>('/stats/insights').then(r => r.data),
 }

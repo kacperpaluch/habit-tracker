@@ -122,6 +122,47 @@ class CalendarDay(BaseModel):
     note: Optional[str] = None
     paused: bool = False
     scheduled: bool = False
+    failed: bool = False
+
+
+# --- Insights ---
+
+class WeekdayStat(BaseModel):
+    weekday: int  # 0=Mon .. 6=Sun
+    rate: float
+    scheduled_count: int
+
+class HabitWeakDay(BaseModel):
+    habit_id: int
+    habit_name: str
+    weekday: int
+    rate: float
+    overall_rate: float
+
+class CorrelationOut(BaseModel):
+    habit_a_id: int
+    habit_a_name: str
+    habit_b_id: int
+    habit_b_name: str
+    phi: float
+    p_b_given_a: float
+    p_b_given_not_a: float
+    shared_days: int
+
+class DecliningHabit(BaseModel):
+    habit_id: int
+    habit_name: str
+    momentum_now: int
+    momentum_then: int
+    drop: int
+
+class InsightsOut(BaseModel):
+    weekday: list[WeekdayStat] = []
+    best_day: Optional[int] = None
+    worst_day: Optional[int] = None
+    habit_weak_days: list[HabitWeakDay] = []
+    correlations: list[CorrelationOut] = []
+    declining: list[DecliningHabit] = []
 
 
 # --- Auth ---

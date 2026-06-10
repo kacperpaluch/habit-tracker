@@ -1,10 +1,16 @@
 # Habit Tracker
 
+[![Docker Hub](https://img.shields.io/docker/pulls/kpa90/habit-tracker?logo=docker)](https://hub.docker.com/r/kpa90/habit-tracker)
+
 Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Działa w pojedynczym kontenerze Docker, dane przechowuje lokalnie w SQLite.
 
 ## Funkcje
 
-- **Tryb binarny i ilościowy** — tak/nie lub cel liczbowy z inkrementalnym dodawaniem
+- **Cztery tryby nawyków** — tak/nie, ilościowy (cel liczbowy z inkrementalnym dodawaniem), czasowy (cel w minutach z wbudowanym stoperem) i negatywny (rzucanie)
+- **Nawyki negatywne (rzucanie)** — "nie palę", "zero cukru": dzień bez wpadki liczy się automatycznie jako sukces, oznaczasz tylko złamanie; streak czystych dni rośnie sam
+- **Nawyki czasowe ze stoperem** — Start/Pauza/Zapisz w karcie nawyku; biegnący timer przeżywa odświeżenie strony (localStorage); minuty sumują się w ciągu dnia
+- **Zaliczenie po osiągnięciu celu** — nawyk ilościowy/czasowy liczy się jako wykonany dopiero gdy wartość osiągnie cel (np. 10/10 pompek), nie przy pierwszym wpisie
+- **Wnioski (insighty)** — analiza ostatnich 90 dni: najmocniejszy i najsłabszy dzień tygodnia, słabe dni per nawyk, korelacje par nawyków ("gdy robisz A, w X% robisz też B"), wykrywanie gasnących nawyków po spadku rytmu
 - **Widok dzienny i tygodniowy** — przełącznik Dzień/Tydzień; siatka 7-dniowa do szybkiego backfillu
 - **Elastyczny harmonogram** — codziennie, X razy w tygodniu, konkretne dni, X razy w miesiącu (rozłożone równomiernie)
 - **Pauza/zamrożenie** — urlop lub choroba nie psuje streaka; opcjonalny przedział "od–do", a bez podanych dat pauza obowiązuje bezterminowo (dopóki włączona)
@@ -17,9 +23,9 @@ Self-hostowana aplikacja do śledzenia nawyków dla jednego użytkownika. Dział
 - **Streaki** — aktualny i najdłuższy, per nawyk (uwzględnia wpisy wstecz przed datą tworzenia nawyku)
 - **System rytmu (momentum)** — triangularna akumulacja punktów: każdy kolejny wykonany dzień dodaje coraz więcej (+1, +2, +3…), każde pominięcie odejmuje (-1, -2, -3…); widoczny na kartach i w tabeli
 - **Trend rytmu** — wykres AreaChart historii momentum (30/90/180 dni) z linią zerową
-- **Heatmapa** — widok aktywności rocznej (styl GitHub) z interaktywnym tooltipem
+- **Heatmapa** — widok aktywności rocznej (styl GitHub) z interaktywnym tooltipem; dla nawyków negatywnych pokazuje czyste dni
 - **Statystyki** — % realizacji tygodniowej i miesięcznej, tabela porównawcza z kolumną rytmu; przełącznik Aktywne/Archiwum z pełnymi danymi dla obu widoków
-- **Kalendarz** — widok miesięczny wykonanych/pominiętych/zapauzowanych dni
+- **Kalendarz** — widok miesięczny wykonanych/pominiętych/zapauzowanych dni; wpadki nawyków negatywnych oznaczone na czerwono
 - **Powiadomienia e-mail** — dzienne podsumowanie przez SMTP
 - **Backup/Eksport/Import** — automatyczny backup SQLite z retencją, eksport JSON
 - **Tryb jasny/ciemny** — wg preferencji systemu lub ręczny przełącznik

@@ -32,17 +32,18 @@ async def run_daily_summary():
 
         today = date.today()
         habits = db.query(Habit).filter(Habit.is_active == True).all()
-        # Only count entries with value > 0 as "done"; value=0 (noted skip) should still trigger a reminder
-        entries_done_today = {
-            e.habit_id for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
+        entries_today = {
+            e.habit_id: e for e in db.query(Entry).filter(Entry.date == today).all()
         }
 
         pending = []
         for h in habits:
-            if stats_lib.is_paused_on(h, today):
+            # Negative habits are "done by default" — never pending
+            if h.mode == "negative" or stats_lib.is_paused_on(h, today):
                 continue
             scheduled = stats_lib.get_scheduled_dates(h, today, today)
-            if scheduled and h.id not in entries_done_today:
+            entry = entries_today.get(h.id)
+            if scheduled and not stats_lib.is_entry_done(h, entry.value if entry else None):
                 pending.append({"name": h.name})
 
         logger.info(f"Daily summary: {len(habits)} active habits, {len(pending)} pending, sending to {settings.notification_email}")
@@ -76,15 +77,16 @@ async def run_habit_reminders():
         if not habits:
             return
 
-        entries_done_today = {
-            e.habit_id for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
+        entries_today = {
+            e.habit_id: e for e in db.query(Entry).filter(Entry.date == today).all()
         }
 
         for h in habits:
-            if stats_lib.is_paused_on(h, today):
+            if h.mode == "negative" or stats_lib.is_paused_on(h, today):
                 continue
             scheduled = stats_lib.get_scheduled_dates(h, today, today)
-            if scheduled and h.id not in entries_done_today:
+            entry = entries_today.get(h.id)
+            if scheduled and not stats_lib.is_entry_done(h, entry.value if entry else None):
                 logger.info(f"Sending reminder for habit '{h.name}' ({now_str})")
                 await send_habit_reminder(settings, h.name)
     except Exception as e:

@@ -4,9 +4,10 @@ from typing import List
 from datetime import date, timedelta
 from ..database import get_db
 from ..models import Habit, Entry
-from ..schemas import HabitStats, HeatmapEntry, CalendarDay
+from ..schemas import HabitStats, HeatmapEntry, CalendarDay, InsightsOut
 from ..auth import get_current_user
 from .. import stats as stats_lib
+from .. import insights as insights_lib
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -38,7 +39,7 @@ def all_habits_stats(
             longest_streak=longest_streak,
             completion_rate_week=rate_week,
             completion_rate_month=rate_month,
-            total_completions=len(entries),
+            total_completions=stats_lib.count_completions(habit, entries, today),
             momentum=momentum,
         ))
     return result
@@ -67,7 +68,7 @@ def habit_stats(habit_id: int, db: Session = Depends(get_db), _=Depends(get_curr
         longest_streak=longest_streak,
         completion_rate_week=rate_week,
         completion_rate_month=rate_month,
-        total_completions=len(entries),
+        total_completions=stats_lib.count_completions(habit, entries, today),
         momentum=momentum,
     )
 
@@ -122,28 +123,41 @@ def habit_calendar(
     start = date(y, m, 1)
     end = date(y, m, last_day)
 
-    entries = {
-        e.date: e
-        for e in db.query(Entry).filter(Entry.habit_id == habit_id, Entry.date >= start, Entry.date <= end).all()
-    }
-    scheduled = set(stats_lib.get_scheduled_dates(habit, start, end))
+    entry_list = db.query(Entry).filter(Entry.habit_id == habit_id, Entry.date >= start, Entry.date <= end).all()
+    entries = {e.date: e for e in entry_list}
+    scheduled_list = stats_lib.get_scheduled_dates(habit, start, end)
+    scheduled = set(scheduled_list)
+    done_set, failed_set = stats_lib.build_day_status(habit, entry_list, scheduled_list, today)
 
     result = []
     current = start
     while current <= end:
         entry = entries.get(current)
         paused = stats_lib.is_paused_on(habit, current)
+        if habit.mode == "negative":
+            completed = current in done_set
+            failed = bool(entry) and (entry.value or 0) > 0
+        else:
+            completed = stats_lib.is_entry_done(habit, entry.value if entry else None)
+            failed = current in failed_set
         result.append(CalendarDay(
             date=current.isoformat(),
-            completed=bool(entry) and (entry.value > 0 if entry else False),
+            completed=completed,
             value=entry.value if entry else None,
             note=entry.note if entry else None,
             paused=paused,
             scheduled=current in scheduled,
+            failed=failed,
         ))
         current += timedelta(days=1)
 
     return result
+
+
+@router.get("/insights", response_model=InsightsOut)
+def insights(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Wnioski: dni tygodnia, korelacje par nawyków, gasnące nawyki (okno 90 dni)."""
+    return insights_lib.compute_insights(db)
 
 
 @router.get("/summary")
@@ -153,7 +167,7 @@ def daily_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
     habits = db.query(Habit).filter(Habit.is_active == True).all()
     entries_today = {
         e.habit_id: e
-        for e in db.query(Entry).filter(Entry.date == today, Entry.value > 0).all()
+        for e in db.query(Entry).filter(Entry.date == today).all()
     }
 
     total = 0
@@ -167,7 +181,11 @@ def daily_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
             continue
         total += 1
         entry = entries_today.get(h.id)
-        completed = bool(entry)
+        if h.mode == "negative":
+            # Clean day (no slip) counts as done
+            completed = not (entry and (entry.value or 0) > 0)
+        else:
+            completed = stats_lib.is_entry_done(h, entry.value if entry else None)
         if completed:
             done += 1
         result.append({

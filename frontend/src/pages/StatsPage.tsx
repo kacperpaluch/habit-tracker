@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   AreaChart, Area, ReferenceLine,
 } from 'recharts'
-import { Flame, Target, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Activity, Archive, RotateCcw } from 'lucide-react'
+import { Flame, Target, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Activity, Archive, RotateCcw, Lightbulb, CalendarX, Link2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -12,6 +12,8 @@ import { habitsApi, statsApi } from '../api/habits'
 import Heatmap from '../components/Heatmap'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { Habit } from '../types'
+
+const WEEKDAY_NAMES = ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela']
 
 function momentumColor(m: number) {
   if (m > 0) return 'text-green-600 dark:text-green-400'
@@ -59,6 +61,12 @@ export default function StatsPage() {
     queryKey: ['momentum-history', selectedHabit, momentumDays],
     queryFn: () => statsApi.momentumHistory(selectedHabit!, momentumDays),
     enabled: !!selectedHabit,
+  })
+
+  const { data: insights } = useQuery({
+    queryKey: ['insights'],
+    queryFn: statsApi.insights,
+    enabled: !showArchive && activeHabits.length > 0,
   })
 
   const restoreMutation = useMutation({
@@ -321,6 +329,75 @@ export default function StatsPage() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Insights */}
+      {!showArchive && insights && (() => {
+        const hasAny = insights.worst_day !== null
+          || insights.habit_weak_days.length > 0
+          || insights.correlations.length > 0
+          || insights.declining.length > 0
+        const rateOf = (wd: number) => insights.weekday.find(w => w.weekday === wd)?.rate
+
+        return (
+          <div className="bg-white dark:bg-warm-900 rounded-2xl p-5 border border-warm-200 dark:border-warm-800">
+            <h2 className="font-semibold text-stone-900 dark:text-stone-100 mb-1 flex items-center gap-2">
+              <Lightbulb size={17} className="text-primary-500" />
+              Wnioski
+            </h2>
+            <p className="text-xs text-stone-400 mb-4">Na podstawie ostatnich 90 dni</p>
+
+            {!hasAny ? (
+              <p className="text-sm text-stone-400 dark:text-stone-500">
+                Za mało danych — wnioski pojawią się, gdy zbierze się więcej historii.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {insights.best_day !== null && insights.worst_day !== null && (
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-warm-50 dark:bg-warm-850/50">
+                    <CalendarX size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-stone-700 dark:text-stone-300">
+                      Najmocniejszy dzień to <strong className="capitalize">{WEEKDAY_NAMES[insights.best_day]}</strong> ({rateOf(insights.best_day)}%),
+                      a najsłabszy <strong className="capitalize">{WEEKDAY_NAMES[insights.worst_day]}</strong> ({rateOf(insights.worst_day)}%).
+                    </p>
+                  </div>
+                )}
+
+                {insights.habit_weak_days.map(w => (
+                  <div key={`weak-${w.habit_id}`} className="flex items-start gap-3 p-3 rounded-xl bg-warm-50 dark:bg-warm-850/50">
+                    <CalendarX size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-stone-700 dark:text-stone-300">
+                      <strong>{w.habit_name}</strong> najczęściej wypada w <span className="capitalize font-medium">{WEEKDAY_NAMES[w.weekday]}</span> —
+                      tylko {w.rate}% wykonania przy {w.overall_rate}% ogółem.
+                    </p>
+                  </div>
+                ))}
+
+                {insights.correlations.map((c, i) => (
+                  <div key={`corr-${i}`} className="flex items-start gap-3 p-3 rounded-xl bg-warm-50 dark:bg-warm-850/50">
+                    <Link2 size={16} className="text-primary-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-stone-700 dark:text-stone-300">
+                      {c.phi > 0 ? (
+                        <>Gdy robisz <strong>{c.habit_a_name}</strong>, w {c.p_b_given_a}% wykonujesz też <strong>{c.habit_b_name}</strong> (bez tego: {c.p_b_given_not_a}%).</>
+                      ) : (
+                        <><strong>{c.habit_a_name}</strong> i <strong>{c.habit_b_name}</strong> rzadko idą w parze — gdy robisz pierwszy, drugi wypada tylko w {c.p_b_given_a}% (bez niego: {c.p_b_given_not_a}%).</>
+                      )}
+                    </p>
+                  </div>
+                ))}
+
+                {insights.declining.map(d => (
+                  <div key={`dec-${d.habit_id}`} className="flex items-start gap-3 p-3 rounded-xl bg-red-50/60 dark:bg-red-900/10">
+                    <TrendingDown size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-stone-700 dark:text-stone-300">
+                      <strong>{d.habit_name}</strong> gaśnie — rytm spadł z {d.momentum_then > 0 ? '+' : ''}{d.momentum_then} do {d.momentum_now > 0 ? '+' : ''}{d.momentum_now} w 3 tygodnie.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Summary table */}
       {activeStats.length > 0 && (
